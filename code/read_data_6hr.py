@@ -47,7 +47,7 @@ df['timedeltas']=timedeltas
 data = np.array(df) 
 
 #split data for different buoys
-data_split = np.split(data,np.where((np.diff(data[:,0])!=0))[0]+1)
+data_split = np.split(data,np.where((data[:,13]!=6))[0]+1)
 
 #%%
 
