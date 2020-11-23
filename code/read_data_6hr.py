@@ -10,13 +10,12 @@ from IPython import get_ipython
 get_ipython().magic('reset -sf')
 import numpy as np
 import matplotlib.pyplot as plt
-import netCDF4 as nc
 from matplotlib import animation
-import datetime
 from scipy import stats
 import cartopy.crs as ccrs
 from matplotlib import ticker, cm
 import cartopy.feature as cfeature
+from global_land_mask import globe
 import cartopy.mpl.ticker as cticker
 import matplotlib.colors as colors
 import pandas as pd
@@ -32,7 +31,9 @@ gps_ids = pd.read_csv(path_data+'gps_ids.dat')
 
 #Filter out buoys without GPS:
 df = df[df['id'].isin(gps_ids['ID'])]
-#%%   
+land = globe.is_land(df['lat'],df['lon'])
+df = df[~land]
+#%%   Calculate time difference at every step
 cnt=0
 df['datetime'] = df['date']+' ' +df['time']
 datetimes = np.zeros(len(df)).astype(datetime)
@@ -44,31 +45,43 @@ for i in range(len(datetimes)-1):
     timedeltas[i] = (datetimes[i+1]-datetimes[i]).total_seconds()/3600
  #%%   
 df['timedeltas']=timedeltas
-data = np.array(df) 
+data = np.array(df) #convert to numpy array
 
 #split data for different buoys
+# data_split = np.split(data,np.where((np.diff(data[:,0])!=0))[0]+1)
 data_split = np.split(data,np.where((data[:,13]!=6))[0]+1)
 
-#%%
+#Filter out buoys with only 1 data point in the region
+cnt = 0
+for i in range(len(data_split)):
+    if len(data_split[cnt])<5:
+        del data_split[cnt]
+        cnt-=1
+    cnt+=1
+
+
+#%% Plot the buoy trajectories
 
 
 colorss = ['r', 'b', 'y','g','k'] #Colors used for the trajectories
         
 #Create plot for the trajectories
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
+ax.set_extent([295, 315, 55, 65])
 for i in range(len(data_split)):
-    ax.plot(data_split[i][:,4],data_split[i][:,3],lw=1,color=colorss[np.mod(i,len(colorss))])
-ax.coastlines() 
+    ax.plot(data_split[i][:,4],data_split[i][:,3],lw=1,color=colorss[np.mod(i,len(colorss))],transform=ccrs.PlateCarree())
+ax.coastlines(resolution='50m') 
 ax.set_xticks([-65, -60, -55, -50, -45])
 plt.title('Particle trajectories in Labrador Sea',fontsize=16)
 plt.xlabel('Longitude (degrees)')
+plt.grid()
 plt.ylabel('Latitude (degrees')
 ax.set_yticks([55, 60, 65])
 plt.show()
 #%%
-i=19
+i=77
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
-ax.plot(data_split[i][:,4],data_split[i][:,3],lw=1,color=colorss[np.mod(i,len(colorss))])
+ax.scatter(data_split[i][:,4],data_split[i][:,3],s=5,color=colorss[np.mod(i,len(colorss))])
 ax.coastlines() 
 plt.xlim([-65,-45])
 plt.ylim([55,65])
@@ -119,7 +132,7 @@ plt.show()
 
 countzero=np.zeros(len(angle))
 for i in range(len(angle)):
-    countzero[i] = np.count_nonzero(dist[i]>40000)
+    countzero[i] = np.count_nonzero(dist[i]>20000)
 #%% Calculate diffusivities
 u= [None]*len(dangle)
 v= [None]*len(dangle)
@@ -132,7 +145,7 @@ for i in range(len(data_split)):
     u[i] = data_split[i][1:-1,8]/100
     v[i] = data_split[i][1:-1,9]/100
 n=2 #number of dimensions
-dt = 3600  #timestep in seconds
+dt = 3600*6  #timestep in seconds
 
 for i in range(len(dangle)):
     vel[i] = np.zeros(len(u[i]))
