@@ -23,10 +23,12 @@ import pandas as pd
 from datetime import datetime
 from datetime import timedelta
 
+path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
+file_data = 'interpolated_gld.20201120_024210.txt'
 #read data
-df  = pd.read_csv('data/interpolated_gld.20201120_024210.txt',sep='\s+')
+df  = pd.read_csv(path_data+file_data,sep='\s+')
 #Read all gps IDs with GPS:
-gps_ids = pd.read_csv('data/gps_ids.dat')
+gps_ids = pd.read_csv(path_data+'gps_ids.dat')
 
 #Filter out buoys without GPS:
 df = df[df['id'].isin(gps_ids['ID'])]
