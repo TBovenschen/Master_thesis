@@ -21,19 +21,35 @@ import cartopy.feature as cfeature
 import cartopy.mpl.ticker as cticker
 from geopy import distance
 
+Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
+
 #Read the data
-data = pd.read_csv('Data/Hourly_Data_Filtered.txt')
+data = pd.read_csv(Path_data+'/Hourly_Data_Filtered.txt')
 data_np = np.array(data) #Convert to numpy array
 #split data for different buoys
 data_split = np.split(data_np,np.where(np.diff(data_np[:,0])!=0)[0]+1)
 #%%
-ArithmeticError(args)colorss = ['r', 'b', 'y','g','k'] #Colors used for the trajectories
+colorss = ['r', 'b', 'y','g','k'] #Colors used for the trajectories
         
 #Create plot for the trajectories
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
 for i in range(len(data_split)):
     ax.scatter(data_split[i][:,3],data_split[i][:,2],s=0.01,color=colorss[np.mod(i,len(colorss))])
 ax.coastlines() 
+ax.set_xticks([-65, -60, -55, -50, -45])
+plt.title('Particle trajectories in Labrador Sea',fontsize=16)
+plt.xlabel('Longitude (degrees)')
+plt.ylabel('Latitude (degrees')
+ax.set_yticks([55, 60, 65])
+plt.show()
+
+#%%
+i=144
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
+ax.scatter(data_split[i][:,3],data_split[i][:,2],s=5,color=colorss[np.mod(i,len(colorss))])
+ax.coastlines() 
+plt.xlim([-65,-45])
+plt.ylim([55,65])
 ax.set_xticks([-65, -60, -55, -50, -45])
 plt.title('Particle trajectories in Labrador Sea',fontsize=16)
 plt.xlabel('Longitude (degrees)')
@@ -62,11 +78,10 @@ for i in range(len(data_split)):
     for j in range(len(data_split[i])-2):        
         dangle[i][j]=angle[i][j+1]-angle[i][j]
         # dx[i][j] = distance.distance(((data_split[i][j+1,2],data_split[i][j,3]), (data_split[i][j,2],data_split[i][j,3]))).m
-np.save('Data/angles.npy',dangle)  
-
+#%%
 countzero=np.zeros(len(angle))
 for i in range(len(angle)):
-    countzero[i] = np.count_nonzero(angle[i]==0)      
+    countzero[i] = np.count_nonzero(dangle[i]==0)      
 #%% Plot the angles  
 
 plt.figure()

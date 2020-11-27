@@ -22,17 +22,16 @@ import pandas as pd
 from datetime import datetime
 from datetime import timedelta
 
-path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
-file_data = 'interpolated_gld.20201120_024210.txt'
+Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
+File_data = 'interpolated_gld.20201120_024210.txt'
 #read data
-df  = pd.read_csv(path_data+file_data,sep='\s+')
+df  = pd.read_csv(Path_data+File_data,sep='\s+')
 #Read all gps IDs with GPS:
-gps_ids = pd.read_csv(path_data+'gps_ids.dat')
+Gps_ids = pd.read_csv(Path_data+'gps_ids.dat')
 
 #Filter out buoys without GPS:
-df = df[df['id'].isin(gps_ids['ID'])]
-land = globe.is_land(df['lat'],df['lon'])
-df = df[~land]
+df = df[df['id'].isin(Gps_ids['ID'])]
+
 #%%   Calculate time difference at every step
 cnt=0
 df['datetime'] = df['date']+' ' +df['time']
@@ -43,11 +42,11 @@ for i in df['datetime']:
 timedeltas = np.zeros(len(datetimes))
 for i in range(len(datetimes)-1):
     timedeltas[i] = (datetimes[i+1]-datetimes[i]).total_seconds()/3600
- #%%   
+#%%   
 df['timedeltas']=timedeltas
 data = np.array(df) #convert to numpy array
 
-#split data for different buoys
+#split data for different buoys (and same buoys with time gap)
 # data_split = np.split(data,np.where((np.diff(data[:,0])!=0))[0]+1)
 data_split = np.split(data,np.where((data[:,13]!=6))[0]+1)
 
@@ -59,11 +58,12 @@ for i in range(len(data_split)):
         cnt-=1
     cnt+=1
 
-
+df = pd.DataFrame(np.concatenate(data_split),columns=df.columns, dtype='object')
+df=df.convert_dtypes()
 #%% Plot the buoy trajectories
 
 
-colorss = ['r', 'b', 'y','g','k'] #Colors used for the trajectories
+colorss = ['r', 'b', 'y','g','orange'] #Colors used for the trajectories
         
 #Create plot for the trajectories
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
@@ -78,20 +78,24 @@ plt.grid()
 plt.ylabel('Latitude (degrees')
 ax.set_yticks([55, 60, 65])
 plt.show()
+
 #%%
-i=77
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
-ax.scatter(data_split[i][:,4],data_split[i][:,3],s=5,color=colorss[np.mod(i,len(colorss))])
-ax.coastlines() 
+i=162
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12),subplot_kw={'projection': ccrs.AzimuthalEquidistant(-55,60)})
+ax.scatter(data_split[i][:,4],data_split[i][:,3],s=2,color=colorss[np.mod(i,len(colorss))],transform=ccrs.AzimuthalEquidistant(-55,60))
+ax.coastlines(transform=ccrs.AzimuthalEquidistant(-55,60)) 
 plt.xlim([-65,-45])
 plt.ylim([55,65])
 ax.set_xticks([-65, -60, -55, -50, -45])
 plt.title('Particle trajectories in Labrador Sea',fontsize=16)
 plt.xlabel('Longitude (degrees)')
 plt.ylabel('Latitude (degrees')
+# for j, txt in enumerate(angle[i]):
+#     ax.annotate(int(txt), (data_split[i][j,4],data_split[i][j,3]))
+# for j, txt in enumerate(dangle[i]):
+#     ax.annotate(int(txt), (data_split[i][j+1,4],data_split[i][j+1,3]-0.05))
 ax.set_yticks([55, 60, 65])
 plt.show()
-# groups=df.groupby('id')
 #%% Calculate angles:
 #Create empty lists (for the different buoys)
 dy= [None]*len(data_split)
@@ -109,30 +113,49 @@ for i in range(len(data_split)):
     for j in range(len(data_split[i])-1):
         dy[i][j] = (data_split[i][j+1,3]-data_split[i][j,3])/360*40008e3
         dx[i][j] = (data_split[i][j+1,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
-        angle[i][j] = np.arctan(dy[i][j]/dx[i][j])/(2*np.pi)*360
+        # angle[i][j] = np.arctan(dy[i][j]/dx[i][j])/(2*np.pi)*360
+        angle[i][j] = np.arctan2(dy[i][j],dx[i][j])/(2*np.pi)*360
+        # if (dx[i][j]<0) & (dy[i][j]<0):
+        #     angle[i][j]=angle[i][j]-180
+        # if (dx[i][j]<0) & (dy[i][j]>0):
+        #     angle[i][j]=angle[i][j]+180
         dist[i][j]= np.sqrt(dy[i][j]**2+dx[i][j]**2)
 #Calculate the difference of the angles between consecutive timestteps
 for i in range(len(data_split)):
     dangle[i]= np.zeros(len(data_split[i])-2)
     for j in range(len(data_split[i])-2):        
         dangle[i][j]=angle[i][j+1]-angle[i][j]
+        if (dangle[i][j]>180):
+            dangle[i][j]=dangle[i][j]-360
+        if  (dangle[i][j]<-180):
+            dangle[i][j]=dangle[i][j]+360
         # dx[i][j] = distance.distance(((data_split[i][j+1,2],data_split[i][j,3]), (data_split[i][j,2],data_split[i][j,3]))).m
 # np.save('Data/angles.npy',dangle)        
 #%% Plot the angles  
-
+mean_angle = np.mean(np.concatenate(dangle))
+skew_angle = stats.skew(np.concatenate(dangle))
+countzero=np.zeros(len(angle))
+for i in range(len(angle)):
+    countzero[i] = np.count_nonzero(dist[i]<100)
+    # dangle[i] = dangle[i][~np.isnan(dangle[i])]
 plt.figure()
-plt.hist(np.concatenate(dangle),bins=300, stacked=True)
+plt.hist(np.concatenate(dangle)[~np.isnan(np.concatenate(dangle))],bins=200, stacked=True)
 plt.title('Difference in angles between consecutive data points',fontsize=16)
 plt.ylabel('Number of datapoints')
 plt.xlabel('Angles (degrees)')
+plt.text(-150,1500, 'Skewness = '+str(skew_angle)[:-14] +'\n'+ 'Mean angle = '+str(mean_angle)[:-14])
+# plt.xlim([-180,180])
 plt.grid()
 plt.show()
+
+
+print('mean=', mean_angle)
+print('skewness',skew_angle)
+print('kurtosis=', stats.kurtosis(np.concatenate(dangle)))
+
 #%%
+test=np.concatenate(dangle)[np.abs(np.concatenate(dangle))<50]
 
-
-countzero=np.zeros(len(angle))
-for i in range(len(angle)):
-    countzero[i] = np.count_nonzero(dist[i]>20000)
 #%% Calculate diffusivities
 u= [None]*len(dangle)
 v= [None]*len(dangle)
@@ -158,26 +181,39 @@ for i in range(len(dangle)):
     tau = dt/(1-phi)    #correlation time scale
     D[i] = 1/n * vel[i]**2 *dt/(1-phi) #The diffusivity
 
+
+dangle_resh = [None]*len(dangle)
 D_resh=[None]*len(dangle)
 for i in range(len(dangle)):
     D_resh[i] = np.insert(D[i],0,np.nan)
-    D[i] = np.append(D[i],np.nan)
+    dangle_resh[i] = np.insert(dangle[i],0,np.nan)
+    D_resh[i]=np.append(D_resh[i],np.nan)
+    dangle_resh[i] = np.append(dangle_resh[i],np.nan)
 D_resh = pd.DataFrame(np.concatenate(D_resh))
-
+dangle_resh= pd.DataFrame(np.concatenate(dangle_resh))
+df['dangle']=dangle_resh
 df['Diff']= D_resh
 df.replace([np.inf, -np.inf], np.nan, inplace=True)
 df.dropna(inplace=True)
 
  #%%   
-Nbin=20
-Mean_diff, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['Diff'],statistic='mean',bins=Nbin)
+Nbin=40
+# Mean_diff, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['Diff'],statistic='mean',bins=Nbin)
+Mean_angles, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
+Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin)
+
+mean_diff = np.zeros(np.shape(Mean_angles))
+for i in range(len(Mean_angles)):
+    phi = np.cos(Mean_angles[i]/360*2*np.pi) # The cosine of the angle
+    tau = dt/(1-phi)    #correlation time scale
+    mean_diff[i,:] = 1/n * Mean_vel[i]**2 *dt/(1-phi) #The diffusivity
 
 x = np.linspace(295,315,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
 
 plt.figure()
-plt.contourf(X,Y,Mean_diff,locator=ticker.LogLocator())
+plt.contourf(X,Y,mean_diff,np.arange(0,100000,1000))
 plt.colorbar()
 plt.title('Diffusivities')
 plt.xlabel('Longitude (degrees')
@@ -206,3 +242,6 @@ plt.show()
 
 # #ax.set_title('$\Phi$ for timestep {:.2f} '.format(t)+'$\Lambda$={:.1f} and '.format(Lambda)+'$r$={:.4f}'.format(r))
 # animat = animation.FuncAnimation(fig,anim, init_func=init, interval=100, blit=True)
+plt.figure()
+plt.hist(df['Diff'],bins=200,range=[0,100])
+plt.show()
