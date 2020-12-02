@@ -21,15 +21,16 @@ import pandas as pd
 from scipy.fft import rfft, rfftfreq
 from datetime import datetime
 from datetime import timedelta
+import pickle
 pi=np.pi
 
 
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
 File_data = 'interpolated_gld.20201120_024210.txt'
 
-df = pd.read_pickel(Path_data+'df.pkl')
-dangle = np.load(Path_data+'dangles.npy')
-data_split=np.load(Path_data+'data_split')
+df = pd.read_pickle(Path_data+'df.pkl')
+dangle = np.load(Path_data+'dangles.npy',allow_pickle=True)
+data_split=np.load(Path_data+'data_split.npy',allow_pickle=True)
 #%% Calculate diffusivities
 u= [None]*len(dangle)
 v= [None]*len(dangle)
@@ -39,8 +40,9 @@ tau = [None]*len(dangle)
 D = [None]*len(dangle)
 #Fill arrays for velocities
 for i in range(len(data_split)):
-    u[i] = data_split[i][1:-1,8]/100
-    v[i] = data_split[i][1:-1,9]/100
+    u[i] = data_split[i][1:-1,6]/100
+    v[i] = data_split[i][1:-1,7]/100
+    vel[i] = data_split
 n=2 #number of dimensions
 dt = 3600*6  #timestep in seconds
 
