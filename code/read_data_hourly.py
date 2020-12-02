@@ -32,10 +32,10 @@ data_split = np.split(data_np,np.where(np.diff(data_np[:,0])!=0)[0]+1)
 colorss = ['r', 'b', 'y','g','k'] #Colors used for the trajectories
         
 #Create plot for the trajectories
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.AzimuthalEquidistant(-55,60)})
 for i in range(len(data_split)):
-    ax.scatter(data_split[i][:,3],data_split[i][:,2],s=0.01,color=colorss[np.mod(i,len(colorss))])
-ax.coastlines() 
+    ax.plot(data_split[i][:,3]-360,data_split[i][:,2],lw=1,color=colorss[np.mod(i,len(colorss))],transform=ccrs.AzimuthalEquidistant(-55,60))
+ax.coastlines(transform=ccrs.AzimuthalEquidistant(-55,60)) 
 ax.set_xticks([-65, -60, -55, -50, -45])
 plt.title('Particle trajectories in Labrador Sea',fontsize=16)
 plt.xlabel('Longitude (degrees)')
@@ -44,10 +44,10 @@ ax.set_yticks([55, 60, 65])
 plt.show()
 
 #%%
-i=144
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
-ax.scatter(data_split[i][:,3],data_split[i][:,2],s=5,color=colorss[np.mod(i,len(colorss))])
-ax.coastlines() 
+i=63
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.AzimuthalEquidistant(-55,60)})
+ax.plot(data_split[i][:,3]-360,data_split[i][:,2],lw=2,color=colorss[np.mod(i,len(colorss))],transform=ccrs.AzimuthalEquidistant(-55,60))
+ax.coastlines(transform=ccrs.AzimuthalEquidistant(-55,60)) 
 plt.xlim([-65,-45])
 plt.ylim([55,65])
 ax.set_xticks([-65, -60, -55, -50, -45])
@@ -71,7 +71,16 @@ for i in range(len(data_split)):
     for j in range(len(data_split[i])-1):
         dy[i][j] = (data_split[i][j+1,2]-data_split[i][j,2])/360*40008e3
         dx[i][j] = (data_split[i][j+1,3]-data_split[i][j,3])/360*40075e3*np.cos(data_split[i][j,2]/360*2*np.pi)
-        angle[i][j] = np.arctan(dy[i][j]/dx[i][j])/(2*np.pi)*360
+        angle[i][j] = np.arctan2(dy[i][j],dx[i][j])/(2*np.pi)*360
+        
+for i in range(len(data_split)):
+    dangle[i]= np.zeros(len(data_split[i])-2)
+    for j in range(len(data_split[i])-2):        
+        dangle[i][j]=angle[i][j+1]-angle[i][j]
+        if (dangle[i][j]>180):
+            dangle[i][j]=dangle[i][j]-360
+        if  (dangle[i][j]<-180):
+            dangle[i][j]=dangle[i][j]+360
 #Calculate the difference of the angles between consecutive timestteps
 for i in range(len(data_split)):
     dangle[i]= np.zeros(len(data_split[i])-2)
@@ -85,11 +94,11 @@ for i in range(len(angle)):
 #%% Plot the angles  
 
 plt.figure()
-plt.hist(np.concatenate(dangle),bins=5000,stacked=True)
+plt.hist(np.concatenate(dangle),bins=10000,stacked=True)
 plt.title('Difference in angles between consecutive data points',fontsize=16)
 plt.ylabel('Number of datapoints')
-plt.ylim([0,1000])
-plt.xlim([-30,30])
+# plt.ylim([0,8000])
+plt.xlim([-180,180])
 plt.xlabel('Angles (degrees)')
 plt.grid()
 plt.show()
@@ -98,7 +107,7 @@ means= np.zeros(len(dangle))
 for i in range(len(dangle)):
     means[i] = np.mean(dangle[3])
 plt.figure()
-plt.hist(dangle[4],bins=200,range=[-50,30])
+plt.hist(dangle_filt,bins=200,range=[-180,180])
 plt.show()
 #%% Calculate diffusivities
 u= [None]*len(dangle)

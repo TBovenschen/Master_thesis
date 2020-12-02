@@ -19,8 +19,10 @@ from global_land_mask import globe
 import cartopy.mpl.ticker as cticker
 import matplotlib.colors as colors
 import pandas as pd
+from scipy.fft import rfft, rfftfreq
 from datetime import datetime
 from datetime import timedelta
+pi=np.pi
 
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
 File_data = 'interpolated_gld.20201120_024210.txt'
@@ -80,9 +82,10 @@ ax.set_yticks([55, 60, 65])
 plt.show()
 
 #%%
-i=162
+i=81
 fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12),subplot_kw={'projection': ccrs.AzimuthalEquidistant(-55,60)})
-ax.scatter(data_split[i][:,4],data_split[i][:,3],s=2,color=colorss[np.mod(i,len(colorss))],transform=ccrs.AzimuthalEquidistant(-55,60))
+ax.plot(data_split[i][:,4],data_split[i][:,3],lw=2,color=colorss[np.mod(i,len(colorss))],transform=ccrs.AzimuthalEquidistant(-55,60))
+ax.scatter(data_split[i][0,4],data_split[i][0,3],transform=ccrs.AzimuthalEquidistant(-55,60))
 ax.coastlines(transform=ccrs.AzimuthalEquidistant(-55,60)) 
 plt.xlim([-65,-45])
 plt.ylim([55,65])
@@ -130,7 +133,8 @@ for i in range(len(data_split)):
         if  (dangle[i][j]<-180):
             dangle[i][j]=dangle[i][j]+360
         # dx[i][j] = distance.distance(((data_split[i][j+1,2],data_split[i][j,3]), (data_split[i][j,2],data_split[i][j,3]))).m
-# np.save('Data/angles.npy',dangle)        
+np.save(Path_data+'dangles.npy',dangle)       
+np.save(Path_data+'data_split.npy', data_split) 
 #%% Plot the angles  
 mean_angle = np.mean(np.concatenate(dangle))
 skew_angle = stats.skew(np.concatenate(dangle))
@@ -139,12 +143,12 @@ for i in range(len(angle)):
     countzero[i] = np.count_nonzero(dist[i]<100)
     # dangle[i] = dangle[i][~np.isnan(dangle[i])]
 plt.figure()
-plt.hist(np.concatenate(dangle)[~np.isnan(np.concatenate(dangle))],bins=200, stacked=True)
+plt.hist(np.concatenate(dangle)[~np.isnan(np.concatenate(dangle))],bins=100,range=[-50,50], stacked=True)
 plt.title('Difference in angles between consecutive data points',fontsize=16)
 plt.ylabel('Number of datapoints')
 plt.xlabel('Angles (degrees)')
 plt.text(-150,1500, 'Skewness = '+str(skew_angle)[:-14] +'\n'+ 'Mean angle = '+str(mean_angle)[:-14])
-# plt.xlim([-180,180])
+# plt.xlim([-160,-150])
 plt.grid()
 plt.show()
 
@@ -153,8 +157,6 @@ print('mean=', mean_angle)
 print('skewness',skew_angle)
 print('kurtosis=', stats.kurtosis(np.concatenate(dangle)))
 
-#%%
-test=np.concatenate(dangle)[np.abs(np.concatenate(dangle))<50]
 
 #%% Calculate diffusivities
 u= [None]*len(dangle)
@@ -196,6 +198,8 @@ df['Diff']= D_resh
 df.replace([np.inf, -np.inf], np.nan, inplace=True)
 df.dropna(inplace=True)
 
+df.to_pickle(Path_data+'df.pkl')
+
  #%%   
 Nbin=40
 # Mean_diff, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['Diff'],statistic='mean',bins=Nbin)
@@ -211,9 +215,9 @@ for i in range(len(Mean_angles)):
 x = np.linspace(295,315,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
-
+#%%
 plt.figure()
-plt.contourf(X,Y,mean_diff,np.arange(0,100000,1000))
+plt.contourf(X,Y,Mean_vel,cmap='rainbow')
 plt.colorbar()
 plt.title('Diffusivities')
 plt.xlabel('Longitude (degrees')
@@ -244,4 +248,26 @@ plt.show()
 # animat = animation.FuncAnimation(fig,anim, init_func=init, interval=100, blit=True)
 plt.figure()
 plt.hist(df['Diff'],bins=200,range=[0,100])
+plt.show()
+
+#%%
+f_cor = 2*7.2921e-5*np.sin(60/360*2*pi)
+T_cor = 2*pi/f_cor/3600
+angle_alles = np.array(df['ve'])
+T = 6*3600
+N = len(angle_alles)
+angles_fft = rfft(angle_alles)
+
+xf = rfftfreq(len(angle_alles),T)
+
+
+plt.figure()
+plt.vlines([1/T_cor,1/12.4206],0,0.01,linestyles='dashed')
+plt.plot(xf[10:]*3600, 2.0/N * np.abs(angles_fft)[10:])
+plt.xscale('log')
+plt.grid()
+plt.title('Fourier spectrum of angles')
+# plt.ylim(0,0.01)
+# plt.xlim([0,0.0005])
+plt.xlabel('f($h^{-1}$)')
 plt.show()
