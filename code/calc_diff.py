@@ -24,66 +24,41 @@ from datetime import timedelta
 import pickle
 pi=np.pi
 
+def calc_diff(df):
+    
+    #%% Calculate diffusivities according to Visser:
 
-Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
-File_data = 'interpolated_gld.20201120_024210.txt'
+    #Assign parameters
+    n=2 #number of dimensions
+    dt = 3600*6  #timestep in seconds
+    Nbin = 20 #number of bins (in both x and y-direction) to average angles
+    
+    phi = np.cos(df['dangle']/360*2*pi)
+    
+    Mean_phi, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], phi,statistic='mean',bins=Nbin)
+    
+    #%%
+    #average angles and velocities over bins:
+    Mean_angles, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
+    Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+    
+    # rearrange the binnumber in  an array with length of data (C-like ordering)
+    binnumber_new = np.zeros(len(df))
+    for j in range(len(df)):
+        binnumber_new[j] = (binnumber[1,j]-1)*Nbin+binnumber[0,j]-1
+    
+    #Create arrays or residual velocity and D
+    vel_res = np.zeros(len(df))
+    D =  np.zeros(len(df))
+    velocity = np.array(df['speed']/100) #total velocity
+    tau = dt/(1-Mean_phi)
+    #calculate the residual velocity (subtract the mean velocity of the grid cell):
+    for i in range(len(df)):
+        vel_res[i] = velocity[i] - np.reshape(Mean_vel,-1, order='F')[int(binnumber_new[i])]
+    #Calculate phi, tau and D
+    for i in range(len(vel_res)):
+        D[i] = 1/n * vel_res[i]**2 *np.reshape(tau,-1,order='F')[int(binnumber_new[i])] #The diffusivity
 
-df = pd.read_pickle(Path_data+'df.pkl')
-dangle = np.load(Path_data+'dangles.npy',allow_pickle=True)
-data_split=np.load(Path_data+'data_split.npy',allow_pickle=True)
-#%% Calculate diffusivities
-u= [None]*len(dangle)
-v= [None]*len(dangle)
-vel= [None]*len(dangle)
-phi = [None]*len(dangle)
-tau = [None]*len(dangle)
-D = [None]*len(dangle)
-#Fill arrays for velocities
-for i in range(len(data_split)):
-    u[i] = data_split[i][1:-1,6]/100
-    v[i] = data_split[i][1:-1,7]/100
-    vel[i] = data_split
-n=2 #number of dimensions
-dt = 3600*6  #timestep in seconds
-
-for i in range(len(dangle)):
-    vel[i] = np.zeros(len(u[i]))
-    for j in range(len(u[i])):
-        vel[i][j] = np.sqrt(u[i][j]**2+v[i][j]**2) #The total velocity
-
-
-for i in range(len(dangle)):
-    phi = np.cos(dangle[i]/360*2*np.pi) # The cosine of the angle
-    tau = dt/(1-phi)    #correlation time scale
-    D[i] = 1/n * vel[i]**2 *dt/(1-phi) #The diffusivity
-
-
-dangle_resh = [None]*len(dangle)
-D_resh=[None]*len(dangle)
-for i in range(len(dangle)):
-    D_resh[i] = np.insert(D[i],0,np.nan)
-    dangle_resh[i] = np.insert(dangle[i],0,np.nan)
-    D_resh[i]=np.append(D_resh[i],np.nan)
-    dangle_resh[i] = np.append(dangle_resh[i],np.nan)
-D_resh = pd.DataFrame(np.concatenate(D_resh))
-dangle_resh= pd.DataFrame(np.concatenate(dangle_resh))
-df['dangle']=dangle_resh
-df['Diff']= D_resh
-df.replace([np.inf, -np.inf], np.nan, inplace=True)
-df.dropna(inplace=True)
-
- #%%   
-Nbin=40
-# Mean_diff, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['Diff'],statistic='mean',bins=Nbin)
-Mean_angles, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
-Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin)
-
-mean_diff = np.zeros(np.shape(Mean_angles))
-for i in range(len(Mean_angles)):
-    phi = np.cos(Mean_angles[i]/360*2*np.pi) # The cosine of the angle
-    tau = dt/(1-phi)    #correlation time scale
-    mean_diff[i,:] = 1/n * Mean_vel[i]**2 *dt/(1-phi) #The diffusivity
-
-x = np.linspace(295,315,Nbin)
-y = np.linspace(55,65,Nbin)
-X,Y = np.meshgrid(x,y)
+    
+    Mean_diff, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], D,statistic='mean',bins=Nbin)
+    return Mean_diff, tau

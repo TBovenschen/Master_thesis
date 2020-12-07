@@ -22,6 +22,7 @@ import pandas as pd
 from scipy.fft import rfft, rfftfreq
 import pickle
 from calc_angle import calc_angle
+from calc_diff import calc_diff
 from datetime import datetime
 from datetime import timedelta
 pi=np.pi
@@ -145,60 +146,28 @@ df.dropna(inplace=True)
 
 
 #%% Calculate diffusivities according to Visser:
-u= [None]*len(dangle)
-v= [None]*len(dangle)
-vel= [None]*len(dangle)
 
-#Fill arrays for velocities
-# for i in range(len(data_split)):
-#     u[i] = data_split[i][1:-1,6]/100 #velocity in x-direction (m/s)
-#     v[i] = data_split[i][1:-1,7]/100 #velocity in y-direction (m/s)
-#     # vel[i] = data_split[i][1:-1,8]/100 #total velocity (m/s)
-
+#Assign parameters
 n=2 #number of dimensions
 dt = 3600*6  #timestep in seconds
-Nbin = 20 #number of bins to average angles
+Nbin = 20 #number of bins (in both x and y-direction) to average angles
 
+phi = np.cos(df['dangle']/360*2*pi)
+Mean_diff, tau = calc_diff(df) # function for calculating diffusion according to visser 
 
-
-#average angles and velocities over bins:
+#%%
+# #average angles and velocities over bins:
 Mean_angles, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
 Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
 
-# rearrange the binnumber in  an array with length of data
-binnumber_new = np.zeros(len(df))
-for j in range(len(df)):
-    binnumber_new[j] = (binnumber[1,j]-1)*Nbin+binnumber[0,j]
-
-#Create arrays or residual velocity, phi, tau and D
-vel_res = np.zeros(len(df))
-phi =  np.zeros(len(df))
-tau  =  np.zeros(len(df))
-D =  np.zeros(len(df))
-velocity = np.array(df['speed']/100) #total velocity
-#calculate the residual velocity (subtract the mean velocity of the grid cell):
-for i in range(len(df)):
-    vel_res[i] = velocity[i] - np.reshape(Mean_vel,-1, order='C')[int(binnumber_new[i])]
-
-#Calculate phi, tau and D
-for i in range(len(vel_res)):
-    phi[i] = np.cos(np.reshape(Mean_angles,-1, order='C')[int(binnumber_new[i])]/360*2*np.pi) # The cosine of the angle
-    tau[i] = dt/(1-phi[i])    #correlation time scale
-    D[i] = 1/n * vel_res[i]**2 *dt/(1-phi[i]) #The diffusivity
-np.nan_to_num(vel_res,copy=False)
-Mean_vel_res, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], vel_res,statistic='mean',bins=Nbin, expand_binnumbers=True)
-np.nan_to_num(D,copy=False)
-
-Mean_diff, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], D,statistic='mean',bins=Nbin)
-
-#%%
+#%% Plot mean velocities
 x = np.linspace(-65,-45,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
 
 plt.figure()
 ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_vel,0 ,1), np.linspace(0,0.4,11),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
+plt.contourf(X,Y,np.swapaxes(Mean_vel,0 ,1), np.linspace(0,0.4,100),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
 plt.colorbar()
 ax1.coastlines(resolution='50m')
 plt.title('Mean Velocities')
@@ -206,13 +175,11 @@ plt.xlabel('Longitude (degrees')
 plt.ylabel('Latitude (degrees')
 plt.show()
 
-#%%
-np.nan_to_num(tau,copy=False)
-Mean_tau, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], tau,statistic='mean',bins=Nbin)
+#%%Plot Tau
 
 plt.figure()
 ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_tau,0 ,1),locator=ticker.LogLocator(),cmap='rainbow',extend='both', transform=ccrs.PlateCarree())
+plt.contourf(X,Y,np.swapaxes(tau,0 ,1)/3600/24,np.linspace(0,2,10),cmap='rainbow',corner_mask=False,extend='both', transform=ccrs.PlateCarree())
 plt.colorbar()
 ax1.coastlines(resolution='50m')
 plt.title('Mean tau')
@@ -221,20 +188,20 @@ plt.ylabel('Latitude (degrees')
 plt.show()
 
 
-#%%
+#%% Plot mean angles
 plt.figure()
 ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_angles, 0, 1),np.linspace(-15,15,21), cmap='bwr', corner_mask=True,extend='both', transform=ccrs.PlateCarree())
+plt.contourf(X,Y,np.swapaxes(Mean_angles, 0, 1),np.linspace(-15,15,101), cmap='bwr', corner_mask=False,extend='both', transform=ccrs.PlateCarree())
 plt.colorbar()
 ax1.coastlines(resolution='50m')
 plt.title('Angles')
 plt.xlabel('Longitude (degrees')
 plt.ylabel('Latitude (degrees')
 plt.show()
-#%%
+#%% Plot diffusions
 plt.figure()
 ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_diff,0,1),locator=ticker.LogLocator(), cmap='rainbow',extend='both', transform=ccrs.PlateCarree())
+plt.contourf(X,Y,np.swapaxes(Mean_diff,0,1), np.linspace(0, 2000, 101), cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
 plt.colorbar()
 ax1.coastlines(resolution='50m')
 plt.title('Diffusivities')
@@ -245,8 +212,8 @@ plt.show()
 
 #%% Fourier analysis
 f_cor = 2*7.2921e-5*np.sin(60/360*2*pi)
-T_cor = 2*pi/f_cor/3600
-angle_alles = np.array(df['speed'])
+T_cor = 2*pi/f_cor/3600*24
+angle_alles = np.array(df['speed'])/100
 T = 6*3600
 N = len(angle_alles)
 angles_fft = rfft(angle_alles)
@@ -255,9 +222,11 @@ xf = rfftfreq(len(angle_alles),T)
 
 
 plt.figure()
-plt.vlines([1/T_cor,1/12.4206],0,0.01,linestyles='dashed')
-plt.plot(xf[10:]*3600, 2.0/N * np.abs(angles_fft)[10:])
+plt.vlines([1/T_cor,1/12.4206*24],0,0.01,linestyles='dashed')
+plt.plot(xf[10:]*3600*24, 2.0/N * np.abs(angles_fft)[10:])
 # plt.xscale('log')
+# plt.xlim(50e-3,10**-1)
+# plt.ylim(0,0.004)
 plt.grid()
 plt.title('Fourier spectrum of velocity')
 # plt.ylim(0,0.01)
