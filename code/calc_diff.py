@@ -24,14 +24,21 @@ from datetime import timedelta
 import pickle
 pi=np.pi
 
-def calc_diff(df):
-    
+def calc_diff(df, Nbin):
+    """
+    A function to calculation the diffusivity per bin according to Visser.
+    INPUT:
+        df: a dataframe with all data
+    OUTPUT:
+        Mean_diff: The diffusivity average over the bins
+        tau: The correlation time scale, average over the bins
+    """
     #%% Calculate diffusivities according to Visser:
 
     #Assign parameters
     n=2 #number of dimensions
     dt = 3600*6  #timestep in seconds
-    Nbin = 20 #number of bins (in both x and y-direction) to average angles
+    #number of bins (in both x and y-direction) to average angles
     
     phi = np.cos(df['dangle']/360*2*pi)
     
@@ -61,4 +68,4 @@ def calc_diff(df):
 
     
     Mean_diff, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], D,statistic='mean',bins=Nbin)
-    return Mean_diff, tau
+    return Mean_diff, tau , vel_res
