@@ -48,7 +48,9 @@ def calc_diff(df, Nbin):
     #average angles and velocities over bins:
     Mean_angles, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
     Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-    
+    Mean_u, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['ve']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+    Mean_v, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+
     # rearrange the binnumber in  an array with length of data (C-like ordering)
     binnumber_new = np.zeros(len(df))
     for j in range(len(df)):
@@ -56,12 +58,19 @@ def calc_diff(df, Nbin):
     
     #Create arrays or residual velocity and D
     vel_res = np.zeros(len(df))
+    vel_u = np.array(df['ve']/100)
+    vel_v = np.array(df['vn']/100)
     D =  np.zeros(len(df))
+    u_res = np.zeros(len(df))
+    v_res = np.zeros(len(df))
     velocity = np.array(df['speed']/100) #total velocity
     tau = dt/(1-Mean_phi)
     #calculate the residual velocity (subtract the mean velocity of the grid cell):
     for i in range(len(df)):
-        vel_res[i] = velocity[i] - np.reshape(Mean_vel,-1, order='F')[int(binnumber_new[i])]
+        # vel_res[i] = velocity[i] - np.reshape(Mean_vel,-1, order='F')[int(binnumber_new[i])]
+        u_res[i] = vel_u[i] - np.reshape(Mean_u,-1, order='F')[int(binnumber_new[i])]
+        v_res[i] = vel_v[i] - np.reshape(Mean_v,-1, order='F')[int(binnumber_new[i])]
+        vel_res[i] = np.sqrt(u_res[i]**2+v_res[i]**2)
     #Calculate phi, tau and D
     for i in range(len(vel_res)):
         D[i] = 1/n * vel_res[i]**2 *np.reshape(tau,-1,order='F')[int(binnumber_new[i])] #The diffusivity
