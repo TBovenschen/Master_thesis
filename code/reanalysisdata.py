@@ -40,7 +40,7 @@ def reanalysis_meanvel(Nbin):
     LON = LON.flatten()
     LAT = LAT.flatten()
     
-    x = np.linspace(-65,-45,Nbin*2)
+    x = np.linspace(-65,-45,Nbin)
     y = np.linspace(55,65,Nbin)
     X,Y = np.meshgrid(x,y)
     X1 = X.flatten()
@@ -58,4 +58,6 @@ def reanalysis_meanvel(Nbin):
         v_new = np.reshape(v_new,np.shape(X))
         u_pertime[i,:,:] = u_new
         v_pertime[i,:,:] = v_new
-    return u_pertime, v_pertime
+        u_pertime[i,:,:].filled(np.nan)
+        v_pertime[i,:,:].filled(np.nan)
+    return u_pertime, v_pertime, time

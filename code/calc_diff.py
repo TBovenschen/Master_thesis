@@ -21,14 +21,18 @@ import pandas as pd
 from scipy.fft import rfft, rfftfreq
 from datetime import datetime
 from datetime import timedelta
+from binned_statistic import binned_statistic_2d_new
+from reanalysisdata import reanalysis_meanvel
 import pickle
 pi=np.pi
 
-def calc_diff(df, Nbin):
+def calc_diff(df, Nbin, mean_method='eulerian'):
     """
     A function to calculation the diffusivity per bin according to Visser.
     INPUT:
         df: a dataframe with all data
+        Nbin: numberes of bins in x and y direction
+        mean_u: the mean velocity field in u
     OUTPUT:
         Mean_diff: The diffusivity average over the bins
         tau: The correlation time scale, average over the bins
@@ -48,9 +52,15 @@ def calc_diff(df, Nbin):
     #average angles and velocities over bins:
     Mean_angles, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
     Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-    Mean_u, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['ve']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-    Mean_v, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-
+    if mean_method=='lagrangian':
+        Mean_u, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['ve']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+        Mean_v, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+    if mean_method=='eulerian':
+        Mean_u, Mean_v,_ = reanalysis_meanvel(Nbin)
+        Mean_u = np.nanmean(Mean_u,axis=0)
+        Mean_v = np.nanmean(Mean_v,axis=0)
+        Mean_u = np.swapaxes(Mean_u,0,1)
+        Mean_v = np.swapaxes(Mean_v,0,1)
     # rearrange the binnumber in  an array with length of data (C-like ordering)
     binnumber_new = np.zeros(len(df))
     for j in range(len(df)):
@@ -63,7 +73,7 @@ def calc_diff(df, Nbin):
     D =  np.zeros(len(df))
     u_res = np.zeros(len(df))
     v_res = np.zeros(len(df))
-    velocity = np.array(df['speed']/100) #total velocity
+    # velocity = np.array(df['speed']/100) #total velocity
     tau = dt/(1-Mean_phi)
     #calculate the residual velocity (subtract the mean velocity of the grid cell):
     for i in range(len(df)):
@@ -74,7 +84,6 @@ def calc_diff(df, Nbin):
     #Calculate phi, tau and D
     for i in range(len(vel_res)):
         D[i] = 1/n * vel_res[i]**2 *np.reshape(tau,-1,order='F')[int(binnumber_new[i])] #The diffusivity
-
     
-    Mean_diff, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], D,statistic='mean',bins=Nbin)
-    return Mean_diff, tau , vel_res
+    Mean_diff, xedges, yedges, _ = binned_statistic_2d_new(df['lon'],df['lat'], D,statistic='nanmean',bins=Nbin)
+    return Mean_diff, tau , vel_res, Mean_u

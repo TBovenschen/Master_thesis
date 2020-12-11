@@ -22,6 +22,8 @@ from scipy.fft import rfft, rfftfreq
 import pickle
 from calc_angle import calc_angle
 from calc_diff import calc_diff
+from scipy import stats
+from binned_statistic import binned_statistic_2d_new
 from datetime import datetime
 from datetime import timedelta
 from reanalysisdata import reanalysis_meanvel
@@ -163,7 +165,7 @@ dt = 3600*6  #timestep in seconds
 Nbin = 40 #number of bins (in both x and y-direction) to average angles
 
 phi = np.cos(df['dangle']/360*2*pi)
-Mean_diff, tau, vel_res = calc_diff(df, Nbin) # function for calculating diffusion according to visser 
+Mean_diff, tau, vel_res, Mean_u_eulerian = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
 
 #%%
 # #average angles and velocities over bins:
@@ -173,75 +175,29 @@ Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['la
 
 
 
+#%% Plot u
 
-#%% Plot mean velocities
+
+counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
 x = np.linspace(-65,-45,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
 
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_vel,0 ,1), np.linspace(0,0.7,100),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar(label='m/s')
-ax1.coastlines(resolution='50m')
-plt.title('Mean Velocities')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
+u_mean_eul, v_mean_eul,time = reanalysis_meanvel(Nbin)
+Mean_u, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['ve']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+Mean_v, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
 
-
-#%%Plot Tau
-
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(tau,0 ,1)/3600/24,np.linspace(0,4,100),cmap='rainbow',corner_mask=False,extend='both', transform=ccrs.PlateCarree())
-plt.colorbar()
-ax1.coastlines(resolution='50m')
-plt.title('Mean tau')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-#%%
-Mean_speed_res, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], vel_res,statistic='mean',bins=Nbin, expand_binnumbers=True)
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_speed_res,0,1), np.linspace(0, 0.4, 101), cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar(label='$m^2/s$')
-ax1.coastlines(resolution='50m')
-plt.title('residual speed')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-
-
-#%% Plot diffusions
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())
-plt.contourf(X,Y,np.swapaxes(Mean_diff,0,1), np.linspace(0, 8000, 101), cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar(label='$m^2/s$')
-ax1.coastlines(resolution='50m')
-plt.title('Diffusivities')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-
-
-#%% Plot u
-Nbin=20
-Mean_u, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['ve']/100,statistic='mean',bins=[Nbin*2,Nbin], expand_binnumbers=True)
-Mean_v, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='mean',bins=[Nbin*2,Nbin], expand_binnumbers=True)
-counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
-x = np.linspace(-65,-45,Nbin*2)
-y = np.linspace(55,65,Nbin)
-X,Y = np.meshgrid(x,y)
-
-
-u_mean_eul, v_mean_eul = reanalysis_meanvel(Nbin)
+#Filter out grid cells with less than 30 data points
+for i in range(40):
+    for j in range(40):
+        if counts_cell[i,j]<10:
+            Mean_diff[i,j]=np.nan
+# Mean_diff, tau, vel_res = calc_diff(df, Nbin) # function for calculating diffusion according to visser 
 
 #%%
 plt.figure()
 ax1 = plt.axes(projection=ccrs.PlateCarree())   
-plt.contourf(X,Y,u_mean_eul[56,:,:], np.linspace(-0.5,0.5,101),cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
+plt.contourf(X,Y,np.swapaxes(tau,0,1), np.linspace(0,5,101),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
 plt.colorbar()
 ax1.coastlines(resolution='50m')
 plt.title('U-velocity')
@@ -250,22 +206,33 @@ plt.ylabel('Latitude (degrees')
 plt.show()
 #%%
 
+plt.figure()
+ax1 = plt.axes(projection=ccrs.PlateCarree())   
+plt.contourf(X,Y,np.swapaxes(Mean_diff,0,1), np.linspace(0,8000,101),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
+plt.colorbar(label='$m^2/s$')
+ax1.coastlines(resolution='50m')
+plt.title('Diffusivity')
+plt.xlabel('Longitude (degrees')
+plt.ylabel('Latitude (degrees')
+plt.show()
+
+#%%
+plt.figure()
+ax1 = plt.axes(projection=ccrs.PlateCarree())   
+plt.contourf(X,Y,np.swapaxes(Mean_u_eulerian,0,1), np.linspace(-0.5,0.5,101),cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
+plt.colorbar(label='$m^2/s$')
+ax1.coastlines(resolution='50m')
+plt.title('Eulerian mean flow field x direction')
+plt.xlabel('Longitude (degrees')
+plt.ylabel('Latitude (degrees')
+plt.show()
+#%%
 plt.figure()
 ax1 = plt.axes(projection=ccrs.PlateCarree())   
 plt.contourf(X,Y,np.swapaxes(Mean_u,0,1), np.linspace(-0.5,0.5,101),cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
 plt.colorbar()
 ax1.coastlines(resolution='50m')
-plt.title('U-velocity')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-#%%
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())   
-plt.contourf(X,Y,np.swapaxes(Mean_v,0,1), np.linspace(-0.5,0.5,101),cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar()
-ax1.coastlines(resolution='50m')
-plt.title('V-velocity')
+plt.title('Lagrangian mean flow field x-direction')
 plt.xlabel('Longitude (degrees')
 plt.ylabel('Latitude (degrees')
 plt.show()
@@ -357,10 +324,17 @@ plt.show()
 # plt.show()
 
 
-# #%% Fourier analysis
-# f_cor = 2*7.2921e-5*np.sin(60/360*2*pi)
-# T_cor = 2*pi/f_cor/3600
-# angle_alles = np.array(df['vn'])/100
+#%% Fourier analysis
+
+# eulerian_vel = np.mean(u_mean_eul, axis=1)
+# eulerian_vel = np.mean(eulerian_vel, axis=1)
+
+# plt.figure()
+# plt.acorr(u_mean_eul[:,18,15], maxlags=20)
+# #%%
+# # f_cor = 2*7.2921e-5*np.sin(60/360*2*pi)
+# # T_cor = 2*pi/f_cor/3600
+# angle_alles = eulerian_vel
 # T = 6*3600
 # N = len(angle_alles)
 # angles_fft = rfft(angle_alles)
@@ -369,7 +343,7 @@ plt.show()
 
 
 # plt.figure()
-# plt.vlines([1/T_cor,1/12.4206],0,0.02,linestyles='dashed')
+# # plt.vlines([1/T_cor,1/12.4206],0,0.02,linestyles='dashed')
 # plt.plot(xf[10:]*3600, 2.0/N * np.abs(angles_fft)[10:])
 # # plt.xscale('log')
 # # plt.xlim(50e-3,10**-1)
