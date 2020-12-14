@@ -6,8 +6,7 @@ Created on Thu Nov 12 13:44:35 2020
 @author: tychobovenschen
 """
 
-from IPython import get_ipython
-get_ipython().magic('reset -sf')
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
@@ -27,6 +26,8 @@ from binned_statistic import binned_statistic_2d_new
 from datetime import datetime
 from datetime import timedelta
 from reanalysisdata import reanalysis_meanvel
+from plotonmap import plotonmap
+from plot_angles import plot_angles
 pi=np.pi
 
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
@@ -61,7 +62,6 @@ df['timedeltas']=timedeltas
 data = np.array(df) #convert to numpy array
 
 #split data for different buoys (and same buoys with time gap)
-# data_split = np.split(data,np.where((np.diff(data[:,0])!=0))[0]+1)
 data_split = np.split(data,np.where((data[:,13]!=6))[0]+1)
 
 #Filter out buoys with only 1 data point in the region
@@ -96,51 +96,12 @@ ax.set_yticks([55, 60, 65])
 plt.show()
 
 #%%
-i=81
-fig = plt.figure()
-ax=plt.axes(projection=ccrs.PlateCarree())
-ax.set_extent([-65, -45, 55, 65])
-ax.plot(data_split[i][:,4],data_split[i][:,3],lw=2,color=colorss[np.mod(i,len(colorss))],transform=ccrs.PlateCarree())
-ax.scatter(data_split[i][0,4],data_split[i][0,3],transform=ccrs.PlateCarree())
-ax.grid()
-ax.coastlines() 
-plt.xlim([-65,-45])
-plt.ylim([55,65])
-ax.set_xticks([-65, -60, -55, -50, -45])
-plt.title('Particle trajectories in Labrador Sea',fontsize=16)
-plt.xlabel('Longitude (degrees)')
-plt.ylabel('Latitude (degrees')
-# for j, txt in enumerate(angle[i]):
-#     ax.annotate(int(txt), (data_split[i][j,4],data_split[i][j,3]))
-# for j, txt in enumerate(dangle[i]):
-#     ax.annotate(int(txt), (data_split[i][j+1,4],data_split[i][j+1,3]-0.05))
-ax.set_yticks([55, 60, 65])
-plt.show()
-plt.close()
-
-
-
-#%%
 #Calculate angles between different data points: (see function for documentation)
 angle, dangle, dist = calc_angle(data_split)
-#%% Plot the angles  
-mean_angle = np.mean(np.concatenate(dangle))
-skew_angle = stats.skew(np.concatenate(dangle))
-countzero=np.zeros(len(angle))
-for i in range(len(angle)):
-    countzero[i] = np.count_nonzero(dist[i]<100)
-    # dangle[i] = dangle[i][~np.isnan(dangle[i])]
-plt.figure()
-plt.hist(np.concatenate(dangle)[~np.isnan(np.concatenate(dangle))],bins=200,range=[-180,180], stacked=True)
-plt.title('Difference in angles between consecutive data points',fontsize=16)
-plt.ylabel('Number of datapoints')
-plt.xlabel('Angles (degrees)')
-plt.text(-150,1500, 'Skewness = '+str(skew_angle)[:-14] +'\n'+ 'Mean angle = '+str(mean_angle)[:-14])
-# plt.xlim([-160,-150])
-plt.grid()
-plt.show()
-plt.close()
 
+#%% Plot the angles 
+
+# plot_angles(dangle,angle,dist) 
 #%%
 #stack all dangles and add them to the dataframe of all data, remove nans and infs
 dangle_resh = [None]*len(dangle)
@@ -164,78 +125,35 @@ n=2 #number of dimensions
 dt = 3600*6  #timestep in seconds
 Nbin = 40 #number of bins (in both x and y-direction) to average angles
 
-phi = np.cos(df['dangle']/360*2*pi)
+# phi = np.cos(df['dangle']/360*2*pi)
 Mean_diff, tau, vel_res, Mean_u_eulerian = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
 
 #%%
 # #average angles and velocities over bins:
 Mean_angles, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
 Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-# Mean_vel_res, xedges, yedges, _ = stats.binned_statistic_2d(df['lon'],df['lat'], vel_res,statistic='mean',bins=Nbin, expand_binnumbers=True)
-
-
 
 #%% Plot u
-
-
+#Count data points per gridcell:
 counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
-x = np.linspace(-65,-45,Nbin)
-y = np.linspace(55,65,Nbin)
-X,Y = np.meshgrid(x,y)
 
-u_mean_eul, v_mean_eul,time = reanalysis_meanvel(Nbin)
-Mean_u, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['ve']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-Mean_v, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-
-#Filter out grid cells with less than 30 data points
+#Filter out grid cells with less than 10 data points
 for i in range(40):
     for j in range(40):
         if counts_cell[i,j]<10:
             Mean_diff[i,j]=np.nan
-# Mean_diff, tau, vel_res = calc_diff(df, Nbin) # function for calculating diffusion according to visser 
+
+
+#%%PLOTTING
+#Define a grid
+x = np.linspace(-65,-45,Nbin)
+y = np.linspace(55,65,Nbin)
+X,Y = np.meshgrid(x,y)
+
+plotonmap(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 10, 'Tau', 'Days')
+plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),0,5000,title='Diffusivities',cbarlabel='$m^2/s$')
 
 #%%
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())   
-plt.contourf(X,Y,np.swapaxes(tau,0,1), np.linspace(0,5,101),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar()
-ax1.coastlines(resolution='50m')
-plt.title('U-velocity')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-#%%
-
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())   
-plt.contourf(X,Y,np.swapaxes(Mean_diff,0,1), np.linspace(0,8000,101),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar(label='$m^2/s$')
-ax1.coastlines(resolution='50m')
-plt.title('Diffusivity')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-
-#%%
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())   
-plt.contourf(X,Y,np.swapaxes(Mean_u_eulerian,0,1), np.linspace(-0.5,0.5,101),cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar(label='$m^2/s$')
-ax1.coastlines(resolution='50m')
-plt.title('Eulerian mean flow field x direction')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
-#%%
-plt.figure()
-ax1 = plt.axes(projection=ccrs.PlateCarree())   
-plt.contourf(X,Y,np.swapaxes(Mean_u,0,1), np.linspace(-0.5,0.5,101),cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-plt.colorbar()
-ax1.coastlines(resolution='50m')
-plt.title('Lagrangian mean flow field x-direction')
-plt.xlabel('Longitude (degrees')
-plt.ylabel('Latitude (degrees')
-plt.show()
 
 # #%%
 # ############## DAVIS:#############
