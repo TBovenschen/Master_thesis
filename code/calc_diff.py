@@ -38,6 +38,7 @@ def calc_diff(df, Nbin, mean_method='eulerian'):
         tau: The correlation time scale, average over the bins
     """
     #%% Calculate diffusivities according to Visser:
+    Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
 
     #Assign parameters
     n=2 #number of dimensions
@@ -82,6 +83,10 @@ def calc_diff(df, Nbin, mean_method='eulerian'):
         v_res[i] = vel_v[i] - np.reshape(Mean_v,-1, order='F')[int(binnumber_new[i])]
         vel_res[i] = np.sqrt(u_res[i]**2+v_res[i]**2)
     #Calculate phi, tau and D
+    if mean_method=='eulerian':
+        u_res=np.load(Path_data+'u_residual_eulerian.npy')
+        v_res=np.load(Path_data+'v_residual_eulerian.npy')
+        vel_res = np.sqrt(u_res**2+v_res**2)
     for i in range(len(vel_res)):
         D[i] = 1/n * vel_res[i]**2 *np.reshape(tau,-1,order='F')[int(binnumber_new[i])] #The diffusivity
     

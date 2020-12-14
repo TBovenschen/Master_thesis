@@ -30,6 +30,7 @@ from plotonmap import plotonmap
 from plot_angles import plot_angles
 import xarray as xr
 import tqdm
+from residual_vel_eul import calc_residual_vel_eul
 
 pi=np.pi
 
@@ -155,7 +156,7 @@ X,Y = np.meshgrid(x,y)
 
 # plotonmap(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 10, 'Tau', 'Days')
 plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),0,5000,title='Diffusivities',cbarlabel='$m^2/s$')
-#%%
+#%% 
 reanalysis_file = 'global-reanalysis-phy-001-030-monthly_1607861506758.nc'
 analysis_file = 'global-analysis-forecast-phy-001-024-monthly_1607528507055.nc'
 Nbin=40
