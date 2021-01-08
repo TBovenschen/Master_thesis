@@ -18,7 +18,9 @@ from global_land_mask import globe
 import cartopy.mpl.ticker as cticker
 from scipy import interpolate
 import matplotlib.colors as colors
-# 
+# #COPERNICUS ANALYSIS DATA:
+# https://resources.marine.copernicus.eu/?option=com_csw&view=order&record_id=eec7a997-c57e-4dfa-9194-4c72154f5cc5vv
+
 def reanalysis_meanvel(Nbin):
     """ Function to read reanalyasis data and interpolate it to the same grid as the lagrangian data"""
     Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
