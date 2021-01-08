@@ -6,3 +6,6 @@
 *.gz
 *.pdf
 *.docx
+*.nc
+scratch/meanflowdisplacementtrial.e53500
+scratch/meanflowdisplacementtrial.o53500
