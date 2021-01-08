@@ -15,3 +15,5 @@ scratch/meanflowdisp1.nc
 scratch/meanflowdisplacementtrial.o53500
 scratch/meanflowdisp1.nc
 data/meanflowdisp.nc
+*.nc
+scratch/meanflowdisplacementtrial.e53500
