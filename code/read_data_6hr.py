@@ -6,7 +6,8 @@ Created on Thu Nov 12 13:44:35 2020
 @author: tychobovenschen
 """
 
-
+from IPython import get_ipython
+get_ipython().magic('reset -sf')
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
@@ -30,15 +31,13 @@ from plotonmap import plotonmap
 from plot_angles import plot_angles
 import xarray as xr
 import tqdm
+from residual_vel_eul import calc_residual_vel_eul
 
 pi=np.pi
-
+#Data paths:
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
 File_data = 'interpolated_gld.20201120_024210.txt'
 
-
-#COPERNICUS ANALYSIS DATA:
-# https://resources.marine.copernicus.eu/?option=com_csw&view=order&record_id=eec7a997-c57e-4dfa-9194-4c72154f5cc5vv
 #read data
 df  = pd.read_csv(Path_data+File_data,sep='\s+')
 #Read all gps IDs with GPS:
@@ -58,10 +57,11 @@ for i in df['datetime']:
 timedeltas = np.zeros(len(datetimes))
 for i in range(len(datetimes)-1):
     timedeltas[i] = (datetimes[i+1]-datetimes[i]).total_seconds()/3600
-#%%   
+#Add the time differences to the original dataframe:
 df['timedeltas']=timedeltas
+df['datetime']=datetimes
 
-
+#Make a numpy array of the data
 data = np.array(df) #convert to numpy array
 
 #split data for different buoys (and same buoys with time gap)
@@ -74,13 +74,11 @@ for i in range(len(data_split)):
         del data_split[cnt]
         cnt-=1
     cnt+=1
-
 #Update the dataframe of all data:
 df = pd.DataFrame(np.concatenate(data_split),columns=df.columns, dtype='object')
 df=df.convert_dtypes()
-del(timedeltas,datetimes,data) #delete unused variables
+del(timedeltas,data) #delete unused variables
 #%% Plot the buoy trajectories
-
 
 colorss = ['r', 'b', 'y','g','orange'] #Colors used for the trajectories
         
@@ -119,8 +117,7 @@ df['dangle']=dangle_resh
 df['dist']=dist_resh
 df.replace([np.inf, -np.inf], np.nan, inplace=True)
 df.dropna(inplace=True)
-
-
+# df.to_pickle(Path_data+'df.pkl')
 #%% Calculate diffusivities according to Visser:
 
 #Assign parameters
@@ -129,22 +126,19 @@ dt = 3600*6  #timestep in seconds
 Nbin = 40 #number of bins (in both x and y-direction) to average angles
 
 # phi = np.cos(df['dangle']/360*2*pi)
-Mean_diff, tau, vel_res, Mean_u_eulerian = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
+Mean_diff, tau, vel_res = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
 
-#%%
-# #average angles and velocities over bins:
-Mean_angles, xedges, yedges,_ = stats.binned_statistic_2d(df['lon'],df['lat'], df['dangle'],statistic='mean',bins=Nbin)
-Mean_vel, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
+
 
 #%% Plot u
 #Count data points per gridcell:
 counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
 
 #Filter out grid cells with less than 10 data points
-for i in range(40):
-    for j in range(40):
-        if counts_cell[i,j]<10:
-            Mean_diff[i,j]=np.nan
+# for i in range(40):
+#     for j in range(40):
+#         if counts_cell[i,j]<10:
+#             Mean_diff[i,j]=np.nan
 
 
 #%%PLOTTING
@@ -153,27 +147,11 @@ x = np.linspace(-65,-45,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
 
-# plotonmap(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 10, 'Tau', 'Days')
-plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),0,5000,title='Diffusivities',cbarlabel='$m^2/s$')
-#%%
-reanalysis_file = 'global-reanalysis-phy-001-030-monthly_1607861506758.nc'
-analysis_file = 'global-analysis-forecast-phy-001-024-monthly_1607528507055.nc'
-Nbin=40
-reanalysis = xr.open_dataset(Path_data+reanalysis_file)
-analysis = xr.open_dataset(Path_data+analysis_file)
+plotonmap(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 6, 'Tau', 'Days')
+plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),0,8000,title='Diffusivities unfiltered',cbarlabel='$m^2/s$')
 
-analysis = analysis.sel(depth=13.6, method='nearest')
-reanalysis = reanalysis.squeeze(dim='depth')
-
-
-ds = reanalysis.combine_first(analysis)
-u_res =np.zeros(len(df))
-v_res =np.zeros(len(df))
-
-df.reset_index(drop=True,inplace=True)
-# for i in range(len(df)):
-#     u_res[i] = df['ve'][i]/100 - ds.uo.sel(time=df['time'][i],longitude=df['lon'][i], latitude=df['lat'][i], method='nearest')
-#     v_res[i] = df['vn'][i]/100 - ds.vo.sel(time=df['time'][i],longitude=df['lon'][i], latitude=df['lat'][i], method='nearest')
+u_res =np.load(Path_data+'u_residual_eulerian.npy')
+u_res_mean, xedges, yedges, binnumber = binned_statistic_2d_new(df['lon'],df['lat'], u_res,statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 
 #%%
 
