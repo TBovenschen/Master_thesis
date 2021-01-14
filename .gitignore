@@ -9,3 +9,5 @@
 *.nc
 scratch/meanflowdisplacementtrial.e53500
 scratch/meanflowdisplacementtrial.o53500
+Literature/library.bib
+Literature/.DS_Store

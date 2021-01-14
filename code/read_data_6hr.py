@@ -134,11 +134,11 @@ Mean_diff, tau, vel_res = calc_diff(df, Nbin,mean_method='eulerian') # function 
 #Count data points per gridcell:
 counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
 
-#Filter out grid cells with less than 10 data points
-# for i in range(40):
-#     for j in range(40):
-#         if counts_cell[i,j]<10:
-#             Mean_diff[i,j]=np.nan
+# Filter out grid cells with less than 10 data points
+for i in range(40):
+    for j in range(40):
+        if counts_cell[i,j]<10:
+            Mean_diff[i,j]=np.nan
 
 
 #%%PLOTTING
