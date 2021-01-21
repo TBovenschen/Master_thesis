@@ -123,7 +123,7 @@ df.dropna(inplace=True)
 #Assign parameters
 n=2 #number of dimensions
 dt = 3600*6  #timestep in seconds
-Nbin = 40 #number of bins (in both x and y-direction) to average angles
+Nbin = 20 #number of bins (in both x and y-direction) to average angles
 
 # phi = np.cos(df['dangle']/360*2*pi)
 Mean_diff, tau, vel_res = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
@@ -132,13 +132,13 @@ Mean_diff, tau, vel_res = calc_diff(df, Nbin,mean_method='eulerian') # function 
 
 #%% Plot u
 #Count data points per gridcell:
-counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
+# counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
 
-# Filter out grid cells with less than 10 data points
-for i in range(40):
-    for j in range(40):
-        if counts_cell[i,j]<10:
-            Mean_diff[i,j]=np.nan
+# # Filter out grid cells with less than 10 data points
+# for i in range(Nbin):
+#     for j in range(Nbin):
+#         if counts_cell[i,j]<10:
+#             Mean_diff[i,j]=np.nan
 
 
 #%%PLOTTING
@@ -147,8 +147,9 @@ x = np.linspace(-65,-45,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
 
+#%%
 plotonmap(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 6, 'Tau', 'Days')
-plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),0,8000,title='Diffusivities unfiltered',cbarlabel='$m^2/s$')
+plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),-10000,10000,title='Diffusivities unfiltered',cbarlabel='$m^2/s$',cmap='coolwarm')
 
 u_res =np.load(Path_data+'u_residual_eulerian.npy')
 u_res_mean, xedges, yedges, binnumber = binned_statistic_2d_new(df['lon'],df['lat'], u_res,statistic='nanmean',bins=Nbin, expand_binnumbers=True)

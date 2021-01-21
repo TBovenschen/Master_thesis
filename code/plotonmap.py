@@ -17,7 +17,7 @@ def plotonmap(X,Y,Z,zmin, zmax, title, cbarlabel, cmap='rainbow'):
     """A function for plotting on a map with projection PlateCarree"""
     plt.figure()
     ax1 = plt.axes(projection=ccrs.PlateCarree())   
-    plt.contourf(X,Y,Z, np.linspace(zmin,zmax,101),cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
+    plt.contourf(X,Y,Z, np.linspace(zmin,zmax,101),cmap=cmap,extend='both', corner_mask=False, transform=ccrs.PlateCarree())
     plt.colorbar(label=cbarlabel)
     ax1.coastlines(resolution='50m')
     plt.title(title)

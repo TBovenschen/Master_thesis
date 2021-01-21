@@ -10,21 +10,12 @@ get_ipython().magic('reset -sf')
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
 import pandas as pd
-import pickle
 import cartopy.crs as ccrs
-from scipy import stats
 from binned_statistic import binned_statistic_2d_new
 from datetime import datetime
-from datetime import timedelta
-from reanalysisdata import reanalysis_meanvel
-from plotonmap import plotonmap
-from plot_angles import plot_angles
-import xarray as xr
 import scipy
 import tqdm
-from residual_vel_eul import calc_residual_vel_eul
 
 
 """A script for calculating the diffusivity tensor according to the method of
@@ -42,7 +33,8 @@ df.reset_index(drop=True,inplace=True)
 
 #Open file with mean flow displacements:
 meanflowdisp=xr.open_dataset(Path_data+'meanflowdisp.nc') #Hourly trajectory data of particles release
-#Add the mean flow distance to the dataframe:
+
+#Add the mean flow distance to the dataframe (and convert to meters):
 df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
 df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
 
@@ -116,7 +108,7 @@ for i in range(len(data_split)):
         #Total distances:
         dy_tot[i][j] = (data_split[i][j+timelapse,3]-data_split[i][j,3])/360*40008e3
         dx_tot[i][j] = (data_split[i][j+timelapse,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
-        # Residual distances (total-mean flow distance)
+        # Residual distances (total distance - mean flow distance)
         dy_res[i][j] = dy_tot[i][j] - data_split[i][j,13]
         dx_res[i][j] = dx_tot[i][j] - data_split[i][j,12]        
 
@@ -141,7 +133,7 @@ for i in range(len(df_davis)):
 
  #%%
 #Define number of grid cells in x- and y direction
-Nbin=40 
+Nbin=20 
 
 #Take the binned average of every component of the diffusivity tensor:
 D_11,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
@@ -149,6 +141,7 @@ D_12,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon']
 D_21,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 D_22,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 #%%
+
 
 #Stack the different components into 1 4 dimensional array.
 
@@ -163,39 +156,53 @@ lon, lat = np.meshgrid(lon,lat)
 
 
 #%%
-#Create xarray dataset:
-k_matrix =xr.Dataset({'k':(['x','y','i','j'],data_xr3)},
-                 coords={
+k_matrix =xr.Dataset({'k11':(['x','y'],D_11),
+                      'k12':(['x','y'],D_12),
+                      'k21':(['x','y'],D_21),
+                      'k22':(['x','y'],D_22)},                     
+                  coords={
                 "lon": (["x","y"],lon),
-                 "lat": (["x","y"],lat)},)
-#Transposed dataset
-k_matrix_T=k_matrix.swap_dims({'i':'j','j':'i'}).transpose()
+                  "lat": (["x","y"],lat)},)
 
-#The symmetric part:
-k_S= (k_matrix+k_matrix_T)/2
+#Symmetric part:
+k_S =xr.Dataset({'k11':(['x','y'],D_11),
+                      'k12':(['x','y'],(D_12+D_21)/2),
+                      'k21':(['x','y'],(D_21+D_12)/2),
+                      'k22':(['x','y'],D_22)},                     
+                  coords={
+                "lon": (["x","y"],lon),
+                  "lat": (["x","y"],lat)},)
+
+
 
 #%%
 #Create arrays for eigen values and eigenvectors:
 eig_val = np.zeros((len(lat),len(lon),2))
 eig_vec = np.zeros((len(lat),len(lon),2,2))
 
-for i in range(40):
-    for j in range(40):
+#Calculate the eigenvalues and eigenvectors for every bin:
+for i in range(Nbin):
+    for j in range(Nbin):
         try:
-            eig_val[i,j,:], eig_vec[i,j,:,:] = scipy.linalg.eig(k_S.k.isel(x=i,y=j),check_finite=True)
-        except (ValueError):
+            eig_val[i,j,:], eig_vec[i,j,:,:] = scipy.linalg.eig(k_S.isel(x=j,y=i).\
+                to_array().values.reshape(2,2),check_finite=True)
+        except (ValueError): #If there are nan values in the diffusivity: fill eigenvalue and eigenvectors with nans
             eig_val[i,j,:]=[np.nan, np.nan]
+            eig_vec[i,j,:,:]=([np.nan, np.nan],[np.nan, np.nan])
             continue
+
+
+#Make an xarray dataset of the eigenvalues and eigenvectors:
 eig_val =xr.Dataset({'labda':(['x','y','i'],eig_val)},
-                 coords={
+                  coords={
                 "lon": (["x","y"],lon),
-                 "lat": (["x","y"],lat)},)
+                  "lat": (["x","y"],lat)},)
 eig_vec =xr.Dataset({'mu':(['x','y','i','j'],eig_vec)},
-                 coords={
+                  coords={
                 "lon": (["x","y"],lon),
-                 "lat": (["x","y"],lat)},
-                 attrs={
-                     "title": 'Eigen vectors per grid cell'})
+                  "lat": (["x","y"],lat)},
+                  attrs={
+                      "title": 'Eigen vectors per grid cell'})
 
 #%%
 #calculate largest and smalles eigenvalue
@@ -204,6 +211,79 @@ index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
 
 plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
-xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_major)),x="lon",y="lat",vmin=0000,corner_mask=False,vmax=12000,cmap='rainbow',levels=50)
+xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
+                 vmin=0000,corner_mask=False,vmax=2000,cmap='rainbow',levels=50)
+ax.coastlines(resolution='50m')
+#%%
+plt.figure()
+ax=plt.axes(projection=ccrs.PlateCarree())
+
+eig_val.labda.attrs['units']='$m^2/s$'
+xr.plot.contourf(eig_val.labda.isel(i=index_major),x="lon",y="lat",\
+                 vmin=-10000,corner_mask=False,vmax=10000,cmap='coolwarm',levels=50)
+plt.title('Major principle component')
 ax.coastlines(resolution='50m')
 
+
+plt.figure()
+ax=plt.axes(projection=ccrs.PlateCarree())
+
+xr.plot.contourf(eig_val.labda.isel(i=index_minor),x="lon",y="lat",\
+                 vmin=-2000,corner_mask=False,vmax=2000,cmap='coolwarm',levels=51)
+ax.coastlines(resolution='50m')
+plt.title('Minor principle component')
+
+
+# dy_tot[i][j] = (data_split[i][j+timelapse,3]-data_split[i][j,3])/360*40008e3
+# dx_tot[i][j] = (data_split[i][j+timelapse,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
+# # Residual distances (total-mean flow distance)
+# dy_res[i][j] = dy_tot[i][j] - data_split[i][j,13]
+# dx_res[i][j] = dx_tot[i][j] - data_split[i][j,12]     
+
+########### INFLUENCE OF INTEGRAL TIME SCALE:
+
+df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
+df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
+
+#%%
+buoynr=1
+ITS=30
+dx_tot_time = np.zeros(ITS)
+dy_tot_time = np.zeros(ITS)
+dx_res_time = np.zeros(ITS)
+dy_res_time = np.zeros(ITS)
+dx_mean_time = np.zeros(ITS)
+dy_mean_time = np.zeros(ITS)
+
+
+
+for i in range(ITS):
+    dx_tot_time[i] = (data_split[buoynr][i*4,4]-data_split[buoynr][0,4])/\
+        360*40075e3*np.cos(data_split[buoynr][0,3]/360*2*np.pi)
+    dy_tot_time[i] = (data_split[buoynr][i*4,3]-data_split[buoynr][0,3])/360*40008e3
+    dx_mean_time[i] = meanflowdisp.lon[buoynr,i*24]-meanflowdisp.lon[buoynr,0]*1.11e5 *np.cos(meanflowdisp.lat[buoynr,0]*np.pi/180)
+    dy_mean_time[i] = meanflowdisp.lat[buoynr,i*24]-meanflowdisp.lat[buoynr,0]*1.11e5 
+    dy_res_time[i]= dy_tot_time[i] - dy_mean_time[i]
+    dx_res_time[i]= dx_tot_time[i] - dx_mean_time[i]
+
+k_time_x =-dx_res_time*u_res[0]
+k_time_y =-dy_res_time*v_res[0]
+
+#%%
+plt.figure()
+plt.plot(np.arange(ITS),k_time_y)
+
+from matplotlib.collections import EllipseCollection
+x = np.arange(20)
+y = np.arange(20)
+X, Y = np.meshgrid(x, y)
+
+XY = np.column_stack((X.ravel(), Y.ravel()))
+
+fig, ax = plt.subplots()
+ells = EllipseCollection(eig_val.labda.isel(i=index_major)/5000,eig_val.labda.isel(i=index_minor)/5000,1,units='x', offsets=XY,
+                       transOffset=ax.transData)
+ax.autoscale_view()
+# ax.coastlines()
+ax.add_collection(ells)
+ax.autoscale()
