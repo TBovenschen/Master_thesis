@@ -140,6 +140,8 @@ D_11,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon']
 D_12,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 D_21,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 D_22,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+counts,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,0],statistic='count',bins=Nbin, expand_binnumbers=True)
+
 #%%
 
 
@@ -173,8 +175,15 @@ k_S =xr.Dataset({'k11':(['x','y'],D_11),
                 "lon": (["x","y"],lon),
                   "lat": (["x","y"],lat)},)
 
-
-
+# for i in range(Nbin):
+#     for j in range(Nbin):
+#         if k_S.counts[i,j]<100:
+#             k_S.k11[i,j] = np.nan
+#             k_S.k12[i,j] = np.nan
+#             k_S.k21[i,j] = np.nan
+#             k_S.k22[i,j] = np.nan
+#         else:
+#             continue
 #%%
 #Create arrays for eigen values and eigenvectors:
 eig_val = np.zeros((len(lat),len(lon),2))
@@ -212,7 +221,7 @@ index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
 plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
 xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
-                 vmin=0000,corner_mask=False,vmax=2000,cmap='rainbow',levels=50)
+                  vmin=0000,corner_mask=False,vmax=2000,cmap='rainbow',levels=50)
 ax.coastlines(resolution='50m')
 #%%
 plt.figure()
@@ -270,20 +279,24 @@ k_time_x =-dx_res_time*u_res[0]
 k_time_y =-dy_res_time*v_res[0]
 
 #%%
+
 plt.figure()
 plt.plot(np.arange(ITS),k_time_y)
-
 from matplotlib.collections import EllipseCollection
-x = np.arange(20)
-y = np.arange(20)
+x = np.linspace(-65,-45,Nbin)
+y = np.linspace(55,65,Nbin)
 X, Y = np.meshgrid(x, y)
 
 XY = np.column_stack((X.ravel(), Y.ravel()))
 
+
 fig, ax = plt.subplots()
-ells = EllipseCollection(eig_val.labda.isel(i=index_major)/5000,eig_val.labda.isel(i=index_minor)/5000,1,units='x', offsets=XY,
-                       transOffset=ax.transData)
-ax.autoscale_view()
-# ax.coastlines()
+ax = plt.axes(projection=ccrs.PlateCarree()) 
+
+ells = EllipseCollection(eig_val.labda.isel(i=index_major)/6000,eig_val.labda.isel(i=index_minor)/6000,\
+                         np.arctan2(eig_vec.mu.isel(i=index_minor,j=0),eig_vec.mu.isel(i=index_minor,j=1)).values/pi*180,units='x', offsets=XY,
+                       transOffset=ax.transData, facecolors='None',edgecolors='tab:blue')
+# ax.autoscale_view()
+ax.coastlines(resolution='50m')
 ax.add_collection(ells)
 ax.autoscale()
