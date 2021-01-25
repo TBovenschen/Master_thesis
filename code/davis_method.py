@@ -48,11 +48,11 @@ df['v_res']=v_res
 df.drop(['speed', 'varlat','varlon', 'vart','dangle','dist'],axis=1,inplace=True)
 
 ####Split the dataframe on the places where timegap >6 hours (different trajectories)#####
-cnt=0 #a counter for the loop
+# cnt=0 #a counter for the loop
 datetimes = np.zeros(len(df)).astype(datetime) #create array for the datetimes
-for i in df['datetime']:
+for cnt,i in enumerate(df['datetime']):
     datetimes[cnt] = datetime.strptime(i,'%Y-%m-%d %H:%M:%S')
-    cnt+=1
+    # cnt+=1
 #Add a column to the data with the time difference between data points:
 for i in range(len(datetimes)-1):
     df['timedeltas'][i] = (datetimes[i+1]-datetimes[i]).total_seconds()/3600
@@ -142,14 +142,15 @@ D_21,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon']
 D_22,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 counts,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,0],statistic='count',bins=Nbin, expand_binnumbers=True)
 
+D_11=np.swapaxes(D_11,0,1)
+D_12=np.swapaxes(D_12,0,1)
+D_21=np.swapaxes(D_21,0,1)
+D_22=np.swapaxes(D_22,0,1)
+counts=np.swapaxes(counts,0,1)
 #%%
 
 
-#Stack the different components into 1 4 dimensional array.
 
-data_xr = np.dstack((D_11,D_12))
-data_xr2 = np.dstack((D_21,D_22))
-data_xr3 = np.swapaxes(np.stack((data_xr,data_xr2),axis=3),0,1)
 
 #Define grid
 lon=np.linspace(-65,-45,Nbin)
@@ -174,16 +175,18 @@ k_S =xr.Dataset({'k11':(['x','y'],D_11),
                   coords={
                 "lon": (["x","y"],lon),
                   "lat": (["x","y"],lat)},)
+counts_xr =xr.Dataset({'counts':(['x','y'],counts)},                     
+                  coords={
+                "lon": (["x","y"],lon),
+                  "lat": (["x","y"],lat)},)
 
-# for i in range(Nbin):
-#     for j in range(Nbin):
-#         if k_S.counts[i,j]<100:
-#             k_S.k11[i,j] = np.nan
-#             k_S.k12[i,j] = np.nan
-#             k_S.k21[i,j] = np.nan
-#             k_S.k22[i,j] = np.nan
-#         else:
-#             continue
+for i in range(Nbin):
+    for j in range(Nbin):
+        if counts_xr.counts[i,j]<50:
+            k_S.k11[i,j] = np.nan
+            k_S.k12[i,j] = np.nan
+            k_S.k21[i,j] = np.nan
+            k_S.k22[i,j] = np.nan
 #%%
 #Create arrays for eigen values and eigenvectors:
 eig_val = np.zeros((len(lat),len(lon),2))
@@ -193,7 +196,7 @@ eig_vec = np.zeros((len(lat),len(lon),2,2))
 for i in range(Nbin):
     for j in range(Nbin):
         try:
-            eig_val[i,j,:], eig_vec[i,j,:,:] = scipy.linalg.eig(k_S.isel(x=j,y=i).\
+            eig_val[i,j,:], eig_vec[i,j,:,:] = scipy.linalg.eig(k_S.isel(x=i,y=j).\
                 to_array().values.reshape(2,2),check_finite=True)
         except (ValueError): #If there are nan values in the diffusivity: fill eigenvalue and eigenvectors with nans
             eig_val[i,j,:]=[np.nan, np.nan]
@@ -222,6 +225,13 @@ plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
 xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
                   vmin=0000,corner_mask=False,vmax=2000,cmap='rainbow',levels=50)
+ax.coastlines(resolution='50m')
+
+#%%
+plt.figure()
+ax=plt.axes(projection=ccrs.PlateCarree())
+xr.plot.pcolormesh(k_S.k11,x="lon",y="lat",\
+                  vmin=000,vmax=2000,cmap='rainbow',levels=50)
 ax.coastlines(resolution='50m')
 #%%
 plt.figure()
@@ -297,6 +307,8 @@ ells = EllipseCollection(eig_val.labda.isel(i=index_major)/6000,eig_val.labda.is
                          np.arctan2(eig_vec.mu.isel(i=index_minor,j=0),eig_vec.mu.isel(i=index_minor,j=1)).values/pi*180,units='x', offsets=XY,
                        transOffset=ax.transData, facecolors='None',edgecolors='tab:blue')
 # ax.autoscale_view()
+# ells.set_array((counts).ravel())
+
 ax.coastlines(resolution='50m')
 ax.add_collection(ells)
 ax.autoscale()

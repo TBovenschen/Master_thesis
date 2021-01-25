@@ -68,6 +68,7 @@ for i in range(len(datetimes)-1):
 
 #Split the different trajectories (when dt is not 6 hours)
 data_np = np.array(df) #make numpy array
+
 data_split = np.split(data_np,np.where((data_np[:,9])!=6)[0]+1)
 
 # Filter out trajectories with less datapoints than 15 days:
@@ -86,6 +87,7 @@ df_davis =df_davis.convert_dtypes()
 ########### CALCULATE RESIDUAL DISTANCES: ##########
 """This part subtracts the distance traveled caused by the mean flow from the total observed distance
     travelled in 15 days, for every data point"""
+
     
 dy_tot= [None]*len(data_split) #Create lists of arrays
 dx_tot= [None]*len(data_split)
@@ -96,13 +98,13 @@ for i in range(len(data_split)):
     dx_tot[i]= np.zeros(len(data_split[i])-timelapse)
     dy_res[i]= np.zeros(len(data_split[i])-timelapse)
     dx_res[i]= np.zeros(len(data_split[i])-timelapse)
-    for j in range(len(data_split[i])-timelapse):  # Calculate distance for 15 days
+    # for j in range(len(data_split[i])-timelapse):  # Calculate distance for 15 days
         #Total distances (converted to meters):
-        dy_tot[i][j] = (data_split[i][j+timelapse,3]-data_split[i][j,3])/360*40008e3
-        dx_tot[i][j] = (data_split[i][j+timelapse,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
-        # Residual distances (total distance - mean flow distance)
-        dy_res[i][j] = dy_tot[i][j] - data_split[i][j,13]
-        dx_res[i][j] = dx_tot[i][j] - data_split[i][j,12]        
+    dy_tot[i] = (data_split[i][timelapse:,3]-data_split[i][:-timelapse,3])/360*40008e3
+    dx_tot[i] = (data_split[i][timelapse:,4]-data_split[i][:-timelapse,4])/360*40075e3*np.cos(data_split[i][:-timelapse,3]/360*2*np.pi,casting='unsafe')
+    # Residual distances (total distance - mean flow distance)
+    # dy_res[i][j] = dy_tot[i][j] - data_split[i][j,13]
+    # dx_res[i][j] = dx_tot[i][j] - data_split[i][j,12]        
 
 # Add again to the dataframe and drop nans:
 nans = [np.nan]*timelapse

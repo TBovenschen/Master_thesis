@@ -44,13 +44,13 @@ df = pd.read_pickle(Path_data+'df.pkl')
 df.reset_index(drop=True,inplace=True)
 
 #Open file with mean flow displacements:
-meanflowdisp=xr.open_dataset(Path_data+'meanflowdisp.nc') #Hourly trajectory data of particles release
+meanflowdisp=xr.open_dataset(Path_data+'meanflowdisp2.nc') #Hourly trajectory data of particles release
 
 
-mfd_lon_time=np.zeros((len(df),30*24))
-mfd_lat_time=np.zeros((len(df),30*24))
+mfd_lon_time=np.zeros((len(df),60*24))
+mfd_lat_time=np.zeros((len(df),60*24))
 
-for i in tqdm.tqdm(range(30*24),position=0,leave=True):
+for i in tqdm.tqdm(range(60*24),position=0,leave=True):
     mfd_lon_time[:,i]=(meanflowdisp.lon[:,i]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
     mfd_lat_time[:,i]=(meanflowdisp.lat[:,i]-meanflowdisp.lat[:,0])*1.11e5
     
@@ -92,7 +92,7 @@ mfd_lon_time_split = np.split(mfd_lat_time,np.where((data_np[:,9])!=6)[0]+1)
 
 # Filter out trajectories with less datapoints than 15 days:
 cnt=0
-timelapse=30*4 #number of datapoints difference (days*4)
+timelapse=60*4 #number of datapoints difference (days*4)
 for i in range(len(data_split)):
     if timelapse>len(data_split[cnt]):
         del(data_split[cnt],mfd_lat_time_split[cnt],mfd_lon_time_split[cnt])
@@ -111,7 +111,7 @@ dy_tot= [None]*len(data_split) #Create lists of arrays
 dx_tot= [None]*len(data_split)
 dy_res= [None]*len(data_split)
 dx_res= [None]*len(data_split)
-timelapse=30*4
+timelapse=60*4
 for i in tqdm.tqdm(range(len(data_split)),position=0,leave=True):
     dy_tot[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) #Create array for each trajectory
     dx_tot[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
@@ -228,12 +228,12 @@ eig_val =xr.Dataset({'labda':(['x','y','t','i'],eig_val)},
                   coords={
                 "lon": (["x","y"],lon),
                   "lat": (["x","y"],lat),
-                  "time": (['time'],np.arange(timelapse))},)
+                  "t": (['t'],np.arange(timelapse))},)
 eig_vec =xr.Dataset({'mu':(['x','y','t','i','j'],eig_vec)},
                   coords={
                 "lon": (["x","y"],lon),
                   "lat": (["x","y"],lat),
-                  "time": (['time'],np.arange(timelapse))},
+                  "t": (['t'],np.arange(timelapse))},
                   attrs={
                       "title": 'Eigen vectors per grid cell'})
 
