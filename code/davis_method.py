@@ -12,10 +12,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import cartopy.crs as ccrs
+import matplotlib.ticker as mticker
+import cartopy.feature as cfeature
 from binned_statistic import binned_statistic_2d_new
+from scipy import stats
 from datetime import datetime
-import scipy
+from scipy import linalg
 import tqdm
+from plotting_functions import *
 
 
 """A script for calculating the diffusivity tensor according to the method of
@@ -122,64 +126,75 @@ df_davis['dx_res']=np.concatenate(dx_res)
 df_davis.dropna(inplace=True)
 #%% ######## Calculate the diffusivities ############
 df_davis.reset_index(drop=True,inplace=True)
-D = np.zeros((len(df_davis),2,2)) #create diffusivity tensor (2 dimensional for each datapoint)
-indicesj=['u_res', 'v_res']
-indicesk=['mf_lon_dist', 'mf_lat_dist']
-for i in range(len(df_davis)):
-    for j in range(2):
-        for k in range(2) :
-            D[i,j,k] = -df_davis[indicesj[j]][i]*df_davis[indicesk[k]][i]
+
+D_11 = -df_davis['u_res'] * df_davis['mf_lon_dist']
+D_12 = -df_davis['v_res'] * df_davis['mf_lon_dist']
+D_21 = -df_davis['u_res'] * df_davis['mf_lat_dist']
+D_22 = -df_davis['v_res'] * df_davis['mf_lat_dist']
 
 
+
+
+
+
+# D_xr  =xr.Dataset({'k11':(['x','y','time'],D_11),
+#                       'k12':(['x','y','time'],D_12),
+#                       'k21':(['x','y','time'],D_21),
+#                       'k22':(['x','y','time'],D_22)},                     
+#                   coords={
+#                 "lon": (["x","y"],df_davis.lon),
+#                   "lat": (["x","y"],df_davis.lat),
+#                   "time": (['time'],df_davis.datetime)},)
  #%%
 #Define number of grid cells in x- and y direction
-Nbin=20 
+Nbin=20
 
 #Take the binned average of every component of the diffusivity tensor:
-D_11,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-D_12,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-D_21,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-D_22,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,1,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-counts,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,0,0],statistic='count',bins=Nbin, expand_binnumbers=True)
+D_11_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_11, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=False)
+D_12_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_12, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
+D_21_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_21, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
+D_22_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_22, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
+counts,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_11, statistic='count',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
 
-D_11=np.swapaxes(D_11,0,1)
-D_12=np.swapaxes(D_12,0,1)
-D_21=np.swapaxes(D_21,0,1)
-D_22=np.swapaxes(D_22,0,1)
-counts=np.swapaxes(counts,0,1)
-#%%
-
-
-
+D_11_bin=np.swapaxes(D_11_bin, 0, 1)
+D_12_bin=np.swapaxes(D_12_bin, 0, 1)
+D_21_bin=np.swapaxes(D_21_bin, 0, 1)
+D_22_bin=np.swapaxes(D_22_bin, 0, 1)
+counts=np.swapaxes(counts, 0, 1)
 
 #Define grid
-lon=np.linspace(-65,-45,Nbin)
-lat = np.linspace(55,65,Nbin)
-lon, lat = np.meshgrid(lon,lat)
+lon=np.linspace(-64.5, -45.5, Nbin)
+lat = np.linspace(55.25, 64.25, Nbin)
+lon, lat = np.meshgrid(lon, lat)
 
+x = np.linspace(-64.5, -45.5,Nbin)
+y = np.linspace(55.25, 64.75,Nbin)
+X, Y = np.meshgrid(x, y)
 
-#%%
-k_matrix =xr.Dataset({'k11':(['x','y'],D_11),
-                      'k12':(['x','y'],D_12),
-                      'k21':(['x','y'],D_21),
-                      'k22':(['x','y'],D_22)},                     
+#%% Add the diffusivity components to 1 xarray dataset
+k_matrix =xr.Dataset({'k11':(['x','y'],D_11_bin),
+                      'k12':(['x','y'],D_12_bin),
+                      'k21':(['x','y'],D_21_bin),
+                      'k22':(['x','y'],D_22_bin)},                     
                   coords={
                 "lon": (["x","y"],lon),
                   "lat": (["x","y"],lat)},)
 
 #Symmetric part:
-k_S =xr.Dataset({'k11':(['x','y'],D_11),
-                      'k12':(['x','y'],(D_12+D_21)/2),
-                      'k21':(['x','y'],(D_21+D_12)/2),
-                      'k22':(['x','y'],D_22)},                     
-                  coords={
-                "lon": (["x","y"],lon),
-                  "lat": (["x","y"],lat)},)
-counts_xr =xr.Dataset({'counts':(['x','y'],counts)},                     
+k_S =xr.Dataset({'k11':(['x','y'],D_11_bin),
+                      'k12':(['x','y'],(D_12_bin+D_21_bin)/2),
+                      'k21':(['x','y'],(D_21_bin+D_12_bin)/2),
+                      'k22':(['x','y'],D_22_bin)},                     
                   coords={
                 "lon": (["x","y"],lon),
                   "lat": (["x","y"],lat)},)
 
+#Same for the number of counts per grid cell
+counts_xr =xr.Dataset({'counts':(['x','y'],counts)},                     
+                  coords={
+                "lon": (["x","y"],lon),
+                  "lat": (["x","y"],lat)},)
+# Filter out grid cells with less then 50 data points
 for i in range(Nbin):
     for j in range(Nbin):
         if counts_xr.counts[i,j]<50:
@@ -196,7 +211,7 @@ eig_vec = np.zeros((len(lat),len(lon),2,2))
 for i in range(Nbin):
     for j in range(Nbin):
         try:
-            eig_val[i,j,:], eig_vec[i,j,:,:] = scipy.linalg.eig(k_S.isel(x=i,y=j).\
+            eig_val[i,j,:], eig_vec[i,j,:,:] = linalg.eig(k_S.isel(x=i,y=j).\
                 to_array().values.reshape(2,2),check_finite=True)
         except (ValueError): #If there are nan values in the diffusivity: fill eigenvalue and eigenvectors with nans
             eig_val[i,j,:]=[np.nan, np.nan]
@@ -205,14 +220,14 @@ for i in range(Nbin):
 
 
 #Make an xarray dataset of the eigenvalues and eigenvectors:
-eig_val =xr.Dataset({'labda':(['x','y','i'],eig_val)},
+eig_val =xr.Dataset({'labda':(['lon','lat','i'],eig_val)},
                   coords={
-                "lon": (["x","y"],lon),
-                  "lat": (["x","y"],lat)},)
-eig_vec =xr.Dataset({'mu':(['x','y','i','j'],eig_vec)},
+                "lon": (["lon"],x),
+                  "lat": (["lat"],y)},)
+eig_vec =xr.Dataset({'mu':(['lon','lat','i','j'],eig_vec)},
                   coords={
-                "lon": (["x","y"],lon),
-                  "lat": (["x","y"],lat)},
+                "lon": (["lon"],x),
+                  "lat": (["lat"],y)},
                   attrs={
                       "title": 'Eigen vectors per grid cell'})
 
@@ -223,8 +238,8 @@ index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
 
 plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
-xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
-                  vmin=0000,corner_mask=False,vmax=2000,cmap='rainbow',levels=50)
+xr.plot.pcolormesh(np.abs(eig_val.labda.isel(i=index_major))/np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
+                  vmin=0000,vmax=100,cmap='rainbow',levels=50,transform=ccrs.PlateCarree())
 ax.coastlines(resolution='50m')
 
 #%%
@@ -232,6 +247,8 @@ plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
 xr.plot.pcolormesh(k_S.k11,x="lon",y="lat",\
                   vmin=000,vmax=2000,cmap='rainbow',levels=50)
+plt.xlim(-65,-45)
+plt.ylim(55,65)
 ax.coastlines(resolution='50m')
 #%%
 plt.figure()
@@ -241,6 +258,8 @@ eig_val.labda.attrs['units']='$m^2/s$'
 xr.plot.contourf(eig_val.labda.isel(i=index_major),x="lon",y="lat",\
                  vmin=-10000,corner_mask=False,vmax=10000,cmap='coolwarm',levels=50)
 plt.title('Major principle component')
+plt.xlim(-65,-45)
+
 ax.coastlines(resolution='50m')
 
 
@@ -251,64 +270,34 @@ xr.plot.contourf(eig_val.labda.isel(i=index_minor),x="lon",y="lat",\
                  vmin=-2000,corner_mask=False,vmax=2000,cmap='coolwarm',levels=51)
 ax.coastlines(resolution='50m')
 plt.title('Minor principle component')
-
-
-# dy_tot[i][j] = (data_split[i][j+timelapse,3]-data_split[i][j,3])/360*40008e3
-# dx_tot[i][j] = (data_split[i][j+timelapse,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
-# # Residual distances (total-mean flow distance)
-# dy_res[i][j] = dy_tot[i][j] - data_split[i][j,13]
-# dx_res[i][j] = dx_tot[i][j] - data_split[i][j,12]     
-
-########### INFLUENCE OF INTEGRAL TIME SCALE:
-
-df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
-df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
-
 #%%
-buoynr=1
-ITS=30
-dx_tot_time = np.zeros(ITS)
-dy_tot_time = np.zeros(ITS)
-dx_res_time = np.zeros(ITS)
-dy_res_time = np.zeros(ITS)
-dx_mean_time = np.zeros(ITS)
-dy_mean_time = np.zeros(ITS)
-
-
-
-for i in range(ITS):
-    dx_tot_time[i] = (data_split[buoynr][i*4,4]-data_split[buoynr][0,4])/\
-        360*40075e3*np.cos(data_split[buoynr][0,3]/360*2*np.pi)
-    dy_tot_time[i] = (data_split[buoynr][i*4,3]-data_split[buoynr][0,3])/360*40008e3
-    dx_mean_time[i] = meanflowdisp.lon[buoynr,i*24]-meanflowdisp.lon[buoynr,0]*1.11e5 *np.cos(meanflowdisp.lat[buoynr,0]*np.pi/180)
-    dy_mean_time[i] = meanflowdisp.lat[buoynr,i*24]-meanflowdisp.lat[buoynr,0]*1.11e5 
-    dy_res_time[i]= dy_tot_time[i] - dy_mean_time[i]
-    dx_res_time[i]= dx_tot_time[i] - dx_mean_time[i]
-
-k_time_x =-dx_res_time*u_res[0]
-k_time_y =-dy_res_time*v_res[0]
-
-#%%
-
 plt.figure()
-plt.plot(np.arange(ITS),k_time_y)
-from matplotlib.collections import EllipseCollection
-x = np.linspace(-65,-45,Nbin)
-y = np.linspace(55,65,Nbin)
-X, Y = np.meshgrid(x, y)
+ax=plt.axes(projection=ccrs.PlateCarree())
 
-XY = np.column_stack((X.ravel(), Y.ravel()))
-
-
-fig, ax = plt.subplots()
-ax = plt.axes(projection=ccrs.PlateCarree()) 
-
-ells = EllipseCollection(eig_val.labda.isel(i=index_major)/6000,eig_val.labda.isel(i=index_minor)/6000,\
-                         np.arctan2(eig_vec.mu.isel(i=index_minor,j=0),eig_vec.mu.isel(i=index_minor,j=1)).values/pi*180,units='x', offsets=XY,
-                       transOffset=ax.transData, facecolors='None',edgecolors='tab:blue')
-# ax.autoscale_view()
-# ells.set_array((counts).ravel())
-
+xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_major))/np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
+                 vmin=0,vmax=40,cmap='viridis',levels=51)
 ax.coastlines(resolution='50m')
-ax.add_collection(ells)
-ax.autoscale()
+plt.title('Anisotropy (major/minor component')
+
+
+
+
+
+#%% Plotting of the ellipses
+
+plot_ellipse(eig_val, eig_vec)
+
+
+#%%
+
+# ds 
+# ds.sel(lat=60)
+# bath = xr.open_dataset(Path_data+'gebco_2020_n65.0_s55.0_w-65.0_e-45.0.nc')
+
+# # bath = bath.interp(lon=x, lat=y)
+# bath_df = bath.sel(lon=df_davis.lon.to_xarray(),lat=df_davis.lat.to_xarray(), method='nearest')
+
+# bath_binned,bin_edges,_ = stats.binned_statistic(bath_df.elevation.values, np.abs(D_11), bins=200)
+
+# plt.scatter(bin_edges[:-1],bath_binned)
+

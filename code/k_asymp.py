@@ -239,7 +239,8 @@ eig_vec =xr.Dataset({'mu':(['x','y','t','i','j'],eig_vec)},
 
 #%%
 
-eig_val = xr.open_dataset(Path_data+'eig_val.nc')
+eig_val = xr.open_dataset(Path_data+'eig_val_60.nc')
+k_S = xr.open_dataset(Path_data+'k_S.nc')
 
 #calculate largest and smalles eigenvalue
 index_major= abs(eig_val.labda).argmax(dim='i',skipna=False)
@@ -250,14 +251,29 @@ index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
 # xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_major)),x="lon",y="lat",\
 #                  vmin=0000,corner_mask=False,vmax=12000,cmap='rainbow',levels=50)
 # ax.coastlines(resolution='50m')
+def norm(data):
+    return (data)/(np.max(data)-np.min(data))
+plt.figure()
+xr.plot.line(np.abs(eig_val.labda.isel(i=index_major).mean(dim=('x','y'))),x='t')
+plt.xlabel('time (days)')
+plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
+
+# normalized = np.zeros((240,20,20))
+# for k in tqdm.tqdm(range(20),position=0):
+#     for j in range(20):
+#         normalized[:,k,j] = norm(np.abs(eig_val.labda.isel(i=index_major).isel(x=j,y=k)))
+# plt.figure()
+# plt.plot(np.linspace(0,240,240),np.nanmean(normalized,axis=(1,2)))
+
+#%%
 
 plt.figure()
-xr.plot.line(abs(eig_val.labda.isel(i=index_major).isel(x=14,y=10)),x='t')
+# for i in range(5):
+xr.plot.line(np.mean(norm(np.abs(eig_val.labda.isel(i=index_minor).isel(x=slice(0,20),y=9))),axis=(0)),x='t')
 plt.xlabel('time (days)')
-plt.xticks(np.linspace(0,121,11),(np.linspace(0,30,11,dtype=int)))
-
-
-
+plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
+plt.ylabel('k')
+plt.title('Major principle component of k')
 # dy_tot[i][j] = (data_split[i][j+timelapse,3]-data_split[i][j,3])/360*40008e3
 # dx_tot[i][j] = (data_split[i][j+timelapse,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
 # # Residual distances (total-mean flow distance)

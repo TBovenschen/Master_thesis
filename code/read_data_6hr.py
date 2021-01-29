@@ -32,7 +32,7 @@ from plot_angles import plot_angles
 import xarray as xr
 import tqdm
 from residual_vel_eul import calc_residual_vel_eul
-
+from plotting_functions import *
 pi=np.pi
 #Data paths:
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
@@ -83,18 +83,10 @@ del(timedeltas,data) #delete unused variables
 colorss = ['r', 'b', 'y','g','orange'] #Colors used for the trajectories
         
 #Create plot for the trajectories
-fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(15,12), subplot_kw={'projection': ccrs.PlateCarree()})
-ax.set_extent([-65, -45, 55, 65])
+fig,ax=plot_basic()
 for i in range(len(data_split)):
     ax.plot(data_split[i][:,4],data_split[i][:,3],lw=1,color=colorss[np.mod(i,len(colorss))],transform=ccrs.PlateCarree())
-ax.coastlines(resolution='50m') 
-ax.set_xticks([-65, -60, -55, -50, -45])
-plt.title('Particle trajectories in Labrador Sea',fontsize=16)
-plt.xlabel('Longitude (degrees)')
-plt.grid()
-plt.ylabel('Latitude (degrees')
-ax.set_yticks([55, 60, 65])
-plt.show()
+plt.title('Drifter trajectories in Labrador Sea',fontsize=16)
 
 #%%
 #Calculate angles between different data points: (see function for documentation)
@@ -102,7 +94,7 @@ angle, dangle, dist = calc_angle(data_split)
 
 #%% Plot the angles 
 
-# plot_angles(dangle,angle,dist) 
+plot_angles(dangle,angle,dist) 
 #%%
 #stack all dangles and add them to the dataframe of all data, remove nans and infs
 dangle_resh = [None]*len(dangle)
