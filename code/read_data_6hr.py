@@ -27,8 +27,6 @@ from binned_statistic import binned_statistic_2d_new
 from datetime import datetime
 from datetime import timedelta
 from reanalysisdata import reanalysis_meanvel
-from plotonmap import plotonmap
-from plot_angles import plot_angles
 import xarray as xr
 import tqdm
 from residual_vel_eul import calc_residual_vel_eul
@@ -83,7 +81,7 @@ del(timedeltas,data) #delete unused variables
 colorss = ['r', 'b', 'y','g','orange'] #Colors used for the trajectories
         
 #Create plot for the trajectories
-fig,ax=plot_basic()
+fig,ax=plot_basicmap()
 for i in range(len(data_split)):
     ax.plot(data_split[i][:,4],data_split[i][:,3],lw=1,color=colorss[np.mod(i,len(colorss))],transform=ccrs.PlateCarree())
 plt.title('Drifter trajectories in Labrador Sea',fontsize=16)
@@ -120,18 +118,7 @@ Nbin = 20 #number of bins (in both x and y-direction) to average angles
 # phi = np.cos(df['dangle']/360*2*pi)
 Mean_diff, tau, vel_res = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
 
-
-
-#%% Plot u
-#Count data points per gridcell:
-# counts_cell, xedges, yedges, binnumber = stats.binned_statistic_2d(df['lon'],df['lat'], df['vn']/100,statistic='count',bins=Nbin, expand_binnumbers=True)
-
-# # Filter out grid cells with less than 10 data points
-# for i in range(Nbin):
-#     for j in range(Nbin):
-#         if counts_cell[i,j]<10:
-#             Mean_diff[i,j]=np.nan
-
+Mean_diff_visser = np.swapaxes(Mean_diff,0,1)
 
 #%%PLOTTING
 #Define a grid
@@ -139,100 +126,12 @@ x = np.linspace(-65,-45,Nbin)
 y = np.linspace(55,65,Nbin)
 X,Y = np.meshgrid(x,y)
 
-#%%
-plotonmap(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 6, 'Tau', 'Days')
-plotonmap(X,Y,np.swapaxes(Mean_diff,0,1),-10000,10000,title='Diffusivities unfiltered',cbarlabel='$m^2/s$',cmap='coolwarm')
+plot_contour(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 4, title='Tau', cbarlabel= 'Days')
+plot_contour(X,Y,np.swapaxes(Mean_diff,0,1),0,8000, title='Diffusivities Visser method',cbarlabel='$m^2/s$',cmap='rainbow')
 
 u_res =np.load(Path_data+'u_residual_eulerian.npy')
 u_res_mean, xedges, yedges, binnumber = binned_statistic_2d_new(df['lon'],df['lat'], u_res,statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 
-#%%
-
-# #%%
-# ############## DAVIS:#############
-
-
-# cnt=0
-# timelapse=15*4 #number of datapoints difference (days*4)
-# for i in range(len(data_split)):
-#     if timelapse>len(data_split[cnt]):
-#         del(data_split[cnt])
-#         continue
-#     cnt+=1
-# #Update the dataframe of all data:
-# df_davis = pd.DataFrame(np.concatenate(data_split),columns=df.columns[0:14], dtype='object')
-# df_davis =df_davis.convert_dtypes()
-
-# #%%
-# dy_davis= [None]*len(data_split)
-# dx_davis= [None]*len(data_split)
-# dist_davis= [None]*len(data_split)
-# for i in range(len(data_split)):
-#     dy_davis[i]= np.zeros(len(data_split[i])-timelapse)
-#     dx_davis[i]= np.zeros(len(data_split[i])-timelapse)
-#     dist_davis[i]= np.zeros(len(data_split[i])-timelapse)
-#     for j in range(len(data_split[i])-timelapse):
-#         dy_davis[i][j] = (data_split[i][j+timelapse,3]-data_split[i][j,3])/360*40008e3
-#         dx_davis[i][j] = (data_split[i][j+timelapse,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
-#         dist_davis[i][j]= np.sqrt(dy_davis[i][j]**2+dx_davis[i][j]**2)
-# nans = [np.nan]*timelapse
-# for i in range(len(dist_davis)):
-#     dist_davis[i] = np.insert(dist_davis[i],0,nans)
-# dist_davis = np.concatenate(dist_davis)
-# df_davis['dist']=dist_davis
-# df_davis.dropna(inplace=True)
-# #%%
-# Mean_dist, xedges, yedges, binnumber_davis = stats.binned_statistic_2d(df_davis['lon'],df_davis['lat'], df_davis['dist'],statistic='mean',bins=Nbin, expand_binnumbers=True)
-# Mean_vel, xedges, yedges, _ = stats.binned_statistic_2d(df_davis['lon'],df_davis['lat'], df_davis['speed']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-# Mean_u, xedges, yedges, _ = stats.binned_statistic_2d(df_davis['lon'],df_davis['lat'], df_davis['ve']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-# Mean_v, xedges, yedges, _ = stats.binned_statistic_2d(df_davis['lon'],df_davis['lat'], df_davis['vn']/100,statistic='mean',bins=Nbin, expand_binnumbers=True)
-
-# # rearrange the binnumber in  an array with length of data (C-like ordering)
-# binnumber_new = np.zeros(len(df_davis))
-# for j in range(len(df_davis)):
-#     binnumber_new[j] = (binnumber_davis[1,j]-1)*Nbin+binnumber_davis[0,j]-1
-
-# dist_davis=dist_davis[np.isfinite(dist_davis)]
-# dist_res = np.zeros(len(dist_davis))
-# vel_res = np.zeros(len(dist_davis))
-# velocity = np.zeros(len(dist_davis))
-# for i in range(len(df_davis)):
-#     dist_res[i] = dist_davis[i] - np.reshape(Mean_dist,-1, order='F')[int(binnumber_new[i])]
-# velocity = np.array(df_davis['speed'])/100
-# #calculate the residual velocity (subtract the mean velocity of the grid cell):
-# for i in range(len(df_davis)):
-#     vel_res[i] = velocity[i] - np.reshape(Mean_vel,-1, order='F')[int(binnumber_new[i])]    
-
-
-# Diff_davis = -vel_res* dist_res
-# Mean_Diff_davis, xedges, yedges, _ = stats.binned_statistic_2d(df_davis['lon'],df_davis['lat'], Diff_davis,statistic='mean',bins=Nbin, expand_binnumbers=True)
-
-
-
-
-
-
-
-# #%% Plot v
-# plt.figure()
-# ax1 = plt.axes(projection=ccrs.PlateCarree())   
-# plt.contourf(X,Y,np.swapaxes(Mean_v,0,1), np.linspace(-0.5,0.5,11), cmap='bwr',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-# plt.colorbar()
-# ax1.coastlines(resolution='50m')
-# plt.title('v')
-# plt.xlabel('Longitude (degrees')
-# plt.ylabel('Latitude (degrees')
-# plt.show()
-# #%% Plot diffusions
-# plt.figure()
-# ax1 = plt.axes(projection=ccrs.PlateCarree())   
-# plt.contourf(X,Y,np.swapaxes(Mean_Diff_davis,0,1), cmap='rainbow',extend='both', corner_mask=False, transform=ccrs.PlateCarree())
-# plt.colorbar()
-# ax1.coastlines(resolution='50m')
-# plt.title('Diffusion davis mean')
-# plt.xlabel('Longitude (degrees')
-# plt.ylabel('Latitude (degrees')
-# plt.show()
 
 
 #%% Fourier analysis

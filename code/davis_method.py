@@ -39,7 +39,7 @@ df.reset_index(drop=True,inplace=True)
 meanflowdisp=xr.open_dataset(Path_data+'meanflowdisp.nc') #Hourly trajectory data of particles release
 
 #Add the mean flow distance to the dataframe (and convert to meters):
-df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
+df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180) 
 df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
 
 #Load the residual velocities and add them to the dataframe:
@@ -79,6 +79,12 @@ plt.plot(df.lon[datastart:dataend],df.lat[datastart:dataend],lw=3,color='r',labe
 plt.scatter(df.lon[datastart],df.lat[datastart],color='y',s=20)
 plt.legend()
 plt.plot()
+
+plot_contour(np.linspace(-65,-45,241),np.linspace(55,65,121), mean_vel_field.uo.isel(time=0), \
+             zmin=-0.6, zmax=0.6, title='Monthly mean zonal velocity', cmap='coolwarm', cbarlabel='$m/s^2$')
+plot_contour(np.linspace(-65,-45,241),np.linspace(55,65,121), mean_vel_field.vo.isel(time=0), \
+             zmin=-0.6, zmax=0.6, title='Monthly mean meridional velocity', cmap='coolwarm', cbarlabel='$m/s^2$')
+
 #%%
 
 
@@ -132,19 +138,6 @@ D_12 = -df_davis['v_res'] * df_davis['mf_lon_dist']
 D_21 = -df_davis['u_res'] * df_davis['mf_lat_dist']
 D_22 = -df_davis['v_res'] * df_davis['mf_lat_dist']
 
-
-
-
-
-
-# D_xr  =xr.Dataset({'k11':(['x','y','time'],D_11),
-#                       'k12':(['x','y','time'],D_12),
-#                       'k21':(['x','y','time'],D_21),
-#                       'k22':(['x','y','time'],D_22)},                     
-#                   coords={
-#                 "lon": (["x","y"],df_davis.lon),
-#                   "lat": (["x","y"],df_davis.lat),
-#                   "time": (['time'],df_davis.datetime)},)
  #%%
 #Define number of grid cells in x- and y direction
 Nbin=20
@@ -181,13 +174,13 @@ k_matrix =xr.Dataset({'k11':(['x','y'],D_11_bin),
                   "lat": (["x","y"],lat)},)
 
 #Symmetric part:
-k_S =xr.Dataset({'k11':(['x','y'],D_11_bin),
-                      'k12':(['x','y'],(D_12_bin+D_21_bin)/2),
-                      'k21':(['x','y'],(D_21_bin+D_12_bin)/2),
-                      'k22':(['x','y'],D_22_bin)},                     
+k_S =xr.Dataset({'k11':(['lat','lon'],D_11_bin),
+                      'k12':(['lat','lon'],(D_12_bin+D_21_bin)/2),
+                      'k21':(['lat','lon'],(D_21_bin+D_12_bin)/2),
+                      'k22':(['lat','lon'],D_22_bin)},                     
                   coords={
-                "lon": (["x","y"],lon),
-                  "lat": (["x","y"],lat)},)
+                "lon": (["lon"],x),
+                  "lat": (["lat"],y)},)
 
 #Same for the number of counts per grid cell
 counts_xr =xr.Dataset({'counts':(['x','y'],counts)},                     
@@ -197,11 +190,16 @@ counts_xr =xr.Dataset({'counts':(['x','y'],counts)},
 # Filter out grid cells with less then 50 data points
 for i in range(Nbin):
     for j in range(Nbin):
-        if counts_xr.counts[i,j]<50:
+        if counts_xr.counts[i,j]<20:
             k_S.k11[i,j] = np.nan
             k_S.k12[i,j] = np.nan
             k_S.k21[i,j] = np.nan
             k_S.k22[i,j] = np.nan
+#%%
+
+
+
+
 #%%
 #Create arrays for eigen values and eigenvectors:
 eig_val = np.zeros((len(lat),len(lon),2))
@@ -211,7 +209,7 @@ eig_vec = np.zeros((len(lat),len(lon),2,2))
 for i in range(Nbin):
     for j in range(Nbin):
         try:
-            eig_val[i,j,:], eig_vec[i,j,:,:] = linalg.eig(k_S.isel(x=i,y=j).\
+            eig_val[i,j,:], eig_vec[i,j,:,:] = linalg.eig(k_S.isel(lat=i,lon=j).\
                 to_array().values.reshape(2,2),check_finite=True)
         except (ValueError): #If there are nan values in the diffusivity: fill eigenvalue and eigenvectors with nans
             eig_val[i,j,:]=[np.nan, np.nan]
@@ -220,11 +218,11 @@ for i in range(Nbin):
 
 
 #Make an xarray dataset of the eigenvalues and eigenvectors:
-eig_val =xr.Dataset({'labda':(['lon','lat','i'],eig_val)},
+eig_val =xr.Dataset({'labda':(['lat','lon','i'],eig_val)},
                   coords={
                 "lon": (["lon"],x),
                   "lat": (["lat"],y)},)
-eig_vec =xr.Dataset({'mu':(['lon','lat','i','j'],eig_vec)},
+eig_vec =xr.Dataset({'mu':(['lat','lon','i','j'],eig_vec)},
                   coords={
                 "lon": (["lon"],x),
                   "lat": (["lat"],y)},
@@ -232,6 +230,8 @@ eig_vec =xr.Dataset({'mu':(['lon','lat','i','j'],eig_vec)},
                       "title": 'Eigen vectors per grid cell'})
 
 #%%
+
+
 #calculate largest and smalles eigenvalue
 index_major= abs(eig_val.labda).argmax(dim='i',skipna=False)
 index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
@@ -243,6 +243,13 @@ xr.plot.pcolormesh(np.abs(eig_val.labda.isel(i=index_major))/np.abs(eig_val.labd
 ax.coastlines(resolution='50m')
 
 #%%
+# plot_contour(X,Y,D_11_bin,0, 2000, 'd', 'd')
+plot_contour(x,y,k_S.k11,zmin=0, zmax=2000)
+# plot_contour(X,Y,eig_val.labda.isel(i=index_major),0, 2000, 'd', 'd')
+# plot_contour(X,Y,k_S.k11,0,2000,'d','d')
+#%%
+
+
 plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
 xr.plot.pcolormesh(k_S.k11,x="lon",y="lat",\
@@ -274,8 +281,8 @@ plt.title('Minor principle component')
 plt.figure()
 ax=plt.axes(projection=ccrs.PlateCarree())
 
-xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_major))/np.abs(eig_val.labda.isel(i=index_minor)),x="lon",y="lat",\
-                 vmin=0,vmax=40,cmap='viridis',levels=51)
+xr.plot.contourf(np.abs(eig_val.labda.isel(i=index_major))/np.abs(eig_val.labda.isel(i=index_minor)),ax=ax, x="lon",y="lat",\
+                 vmin=0,vmax=40,cmap='viridis',levels=51, transform=ccrs.PlateCarree())
 ax.coastlines(resolution='50m')
 plt.title('Anisotropy (major/minor component')
 

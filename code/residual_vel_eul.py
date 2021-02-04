@@ -15,8 +15,8 @@ import pandas as pd
 def calc_residual_vel_eul(df):
     #Name of paths and files
     Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
-    reanalysis_file = 'global-reanalysis-phy-001-030-monthly_1610013590138.nc'
-    analysis_file = 'global-analysis-forecast-phy-001-024-monthly_1607528507055.nc'
+    reanalysis_file = 'global-reanalysis-phy-001-030-monthly_1612428165441.nc'
+    analysis_file = 'global-analysis-forecast-phy-001-024-monthly_1612428303941.nc'
     
     
     reanalysis = xr.open_dataset(Path_data+reanalysis_file)
@@ -29,7 +29,7 @@ def calc_residual_vel_eul(df):
     ds = reanalysis.combine_first(analysis)
     ds.to_netcdf(Path_data+'Mean_velocities_eulerian.nc')
     #gridsize where to interpolate to
-    Nbin=40
+    Nbin=20
     #Interpolate to new grid:
     x = np.linspace(-65,-45,2*Nbin)
     y = np.linspace(55,65,Nbin)
