@@ -11,6 +11,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import pandas as pd
+import tqdm
 
 def calc_residual_vel_eul(df):
     #Name of paths and files
@@ -28,12 +29,13 @@ def calc_residual_vel_eul(df):
     
     ds = reanalysis.combine_first(analysis)
     ds.to_netcdf(Path_data+'Mean_velocities_eulerian.nc')
+    
     #gridsize where to interpolate to
-    Nbin=20
-    #Interpolate to new grid:
-    x = np.linspace(-65,-45,2*Nbin)
-    y = np.linspace(55,65,Nbin)
-    ds = ds.interp(longitude=x,  latitude=y, method='linear')
+    # Nbin=40
+    # #Interpolate to new grid:
+    # x = np.linspace(-65,-45,Nbin)
+    # y = np.linspace(55,65,Nbin)
+    # ds = ds.interp(longitude=x,  latitude=y, method='linear')
     
     #Reset index of dataframe and create arrays:
     df.reset_index(drop=True,inplace=True)
@@ -41,10 +43,10 @@ def calc_residual_vel_eul(df):
     v_res =np.zeros(len(df))
     
     #Calculate the residual velocities
-    for i in range(len(df)):
-        u_res[i] = df['ve'][i]/100 - ds.uo.sel(time=df['time'][i],longitude=df['lon'][i], latitude=df['lat'][i], method='nearest')
-        v_res[i] = df['vn'][i]/100 - ds.vo.sel(time=df['time'][i],longitude=df['lon'][i], latitude=df['lat'][i], method='nearest')
-    np.save(Path_data+'u_residual_eulerian.npy', u_res)
-    np.save(Path_data+'v_residual_eulerian.npy', v_res)
+    # for i in range(len(df)):
+    u_res = df['ve']/100 - ds.uo.sel(time=df['datetime'],longitude=df['lon'], latitude=df['lat'], method='nearest')
+    v_res = df['vn']/100 - ds.vo.sel(time=df['datetime'],longitude=df['lon'], latitude=df['lat'], method='nearest')
+    np.save(Path_data+'u_residual_eulerian.npy', u_res, allow_pickle=True)
+    np.save(Path_data+'v_residual_eulerian.npy', v_res, allow_pickle=True)
     return ds, u_res, v_res
     

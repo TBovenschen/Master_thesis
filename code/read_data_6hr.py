@@ -10,26 +10,20 @@ from IPython import get_ipython
 get_ipython().magic('reset -sf')
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import stats
+import scipy.stats as stats
 import cartopy.crs as ccrs
-from matplotlib import ticker, cm
-import cartopy.feature as cfeature
-from global_land_mask import globe
-import cartopy.mpl.ticker as cticker
-import matplotlib.colors as colors
 import pandas as pd
-from scipy.fft import rfft, rfftfreq
-import pickle
+#import pickle
 from calc_angle import calc_angle
 from calc_diff import calc_diff
-from scipy import stats
-from binned_statistic import binned_statistic_2d_new
+# from binned_statistic import binned_statistic_2d_new
+from binned_statistic2 import binned_statistic_2d_new
 from datetime import datetime
-from datetime import timedelta
-from reanalysisdata import reanalysis_meanvel
+#from datetime import timedelta
+#from reanalysisdata import reanalysis_meanvel
 import xarray as xr
-import tqdm
-from residual_vel_eul import calc_residual_vel_eul
+#import tqdm
+#from residual_vel_eul import calc_residual_vel_eul
 from plotting_functions import *
 pi=np.pi
 #Data paths:
@@ -108,6 +102,53 @@ df['dist']=dist_resh
 df.replace([np.inf, -np.inf], np.nan, inplace=True)
 df.dropna(inplace=True)
 # df.to_pickle(Path_data+'df.pkl')
+
+# ds, u_res, v_res = calc_residual_vel_eul(df)
+#%%
+Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
+reanalysis_file = 'global-reanalysis-phy-001-030-monthly_1612428165441.nc'
+analysis_file = 'global-analysis-forecast-phy-001-024-monthly_1612428303941.nc'
+
+
+reanalysis = xr.open_dataset(Path_data+reanalysis_file)
+analysis = xr.open_dataset(Path_data+analysis_file)
+
+
+analysis = analysis.sel(depth=13.6, method='nearest')
+reanalysis = reanalysis.squeeze(dim='depth')
+
+ds = reanalysis.combine_first(analysis)
+ds.to_netcdf(Path_data+'Mean_velocities_eulerian.nc')
+
+# filter out grid cells where the ice concentration is more then 10%:
+# ds = ds.where((ds.siconc<0.1) | (xr.ufuncs.isnan(ds.siconc)))
+
+
+#gridsize where to interpolate to
+Nbin=40
+#Interpolate to new grid:
+x = np.linspace(-65,-45,Nbin)
+y = np.linspace(55,65,Nbin)
+ds = ds.interp(longitude=x,  latitude=y, method='linear')
+
+#Reset index of dataframe and create arrays:
+df.reset_index(drop=True,inplace=True)
+u_res =np.zeros(len(df))
+v_res =np.zeros(len(df))
+
+#Calculate the residual velocities
+# for i in range(len(df)):
+u_res = df['ve']/100 - ds.uo.sel(time=xr.DataArray(df['datetime']),longitude=xr.DataArray(df['lon']), latitude=xr.DataArray(df['lat']), method='nearest')
+v_res = df['vn']/100 - ds.vo.sel(time=xr.DataArray(df['datetime']),longitude=xr.DataArray(df['lon']), latitude=xr.DataArray(df['lat']), method='nearest')
+# np.save(Path_data+'u_residual_eulerian.npy', u_res, allow_pickle=False)
+# np.save(Path_data+'v_residual_eulerian.npy', v_res, allow_pickle=False)
+u_res.to_pickle(Path_data+'u_residual_eulerian.npy')
+v_res.to_pickle(Path_data+'v_residual_eulerian.npy')
+
+print(np.count_nonzero(~np.isfinite(u_res)))
+
+# u_res=pd.read_pickle(Path_data+'u_residual_eulerian.npy')
+
 #%% Calculate diffusivities according to Visser:
 
 #Assign parameters
@@ -129,8 +170,8 @@ X,Y = np.meshgrid(x,y)
 plot_contour(X, Y, np.swapaxes(tau,0,1)/3600/24, 0, 4, title='Tau', cbarlabel= 'Days')
 plot_contour(X,Y,np.swapaxes(Mean_diff,0,1),0,8000, title='Diffusivities Visser method',cbarlabel='$m^2/s$',cmap='rainbow')
 
-u_res =np.load(Path_data+'u_residual_eulerian.npy')
-u_res_mean, xedges, yedges, binnumber = binned_statistic_2d_new(df['lon'],df['lat'], u_res,statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+# u_res =np.load(Path_data+'u_residual_eulerian.npy')
+# u_res_mean, xedges, yedges, binnumber = binned_statistic_2d_new(df['lon'],df['lat'], u_res,statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 
 
 

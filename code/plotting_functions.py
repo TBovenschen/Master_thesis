@@ -6,22 +6,20 @@ Created on Fri Jan 29 13:55:10 2021
 @author: tychobovenschen
 """
 
-from IPython import get_ipython
-get_ipython().magic('reset -sf')
-import xarray as xr
+
+#import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import cartopy.crs as ccrs
-import matplotlib.ticker as mticker
+#import matplotlib.ticker as mticker
 import cartopy.feature as cfeature
-from binned_statistic import binned_statistic_2d_new
 from scipy import stats
-from datetime import datetime
-from scipy import linalg
-import tqdm
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
-                               AutoMinorLocator, LinearLocator)
+#from datetime import datetime
+#from scipy import linalg
+#import tqdm
+#from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
+#                               AutoMinorLocator, LinearLocator)
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from matplotlib.collections import EllipseCollection
 
@@ -29,7 +27,7 @@ from matplotlib.collections import EllipseCollection
 #Data paths:
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
 
-mean_vel_field = xr.open_dataset(Path_data+'Mean_velocities_eulerian_v2.nc')
+# mean_vel_field = xr.open_dataset(Path_data+'Mean_velocities_eulerian_v2.nc')
 
 
 land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m',

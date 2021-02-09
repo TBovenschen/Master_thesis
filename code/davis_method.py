@@ -14,7 +14,7 @@ import pandas as pd
 import cartopy.crs as ccrs
 import matplotlib.ticker as mticker
 import cartopy.feature as cfeature
-from binned_statistic import binned_statistic_2d_new
+from binned_statistic2 import binned_statistic_2d_new
 from scipy import stats
 from datetime import datetime
 from scipy import linalg
@@ -43,8 +43,9 @@ df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.c
 df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
 
 #Load the residual velocities and add them to the dataframe:
-u_res =np.load(Path_data+'u_residual_eulerian.npy')
-v_res =np.load(Path_data+'v_residual_eulerian.npy')
+u_res=pd.read_pickle(Path_data+'u_residual_eulerian.npy')
+v_res=pd.read_pickle(Path_data+'v_residual_eulerian.npy')
+# v_res =np.load(Path_data+'v_residual_eulerian.npy')
 df['u_res']=u_res
 df['v_res']=v_res
 
@@ -133,21 +134,24 @@ df_davis.dropna(inplace=True)
 #%% ######## Calculate the diffusivities ############
 df_davis.reset_index(drop=True,inplace=True)
 
-D_11 = -df_davis['u_res'] * df_davis['mf_lon_dist']
-D_12 = -df_davis['v_res'] * df_davis['mf_lon_dist']
-D_21 = -df_davis['u_res'] * df_davis['mf_lat_dist']
-D_22 = -df_davis['v_res'] * df_davis['mf_lat_dist']
+D_11 = -1*df_davis['u_res'] * df_davis['mf_lon_dist']
+D_12 = -1*df_davis['v_res'] * df_davis['mf_lon_dist']
+D_21 = -1*df_davis['u_res'] * df_davis['mf_lat_dist']
+D_22 = -1*df_davis['v_res'] * df_davis['mf_lat_dist']
 
+test=np.array(D_11)
  #%%
 #Define number of grid cells in x- and y direction
 Nbin=20
 
+
+
 #Take the binned average of every component of the diffusivity tensor:
-D_11_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_11, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=False)
-D_12_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_12, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
-D_21_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_21, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
-D_22_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_22, statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
-counts,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_11, statistic='count',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
+D_11_bin,  xedges, yedges,_ = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'],D_11.astype('float'), statistic='nanmean',bins=Nbin)
+D_12_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_12.astype('float'), statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+D_21_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_21.astype('float'), statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
+D_22_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_22.astype('float'), statistic='nanmean',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
+counts,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D_11.astype('float'), statistic='count',bins=Nbin, range=([-65,-45],[55,65]), expand_binnumbers=True)
 
 D_11_bin=np.swapaxes(D_11_bin, 0, 1)
 D_12_bin=np.swapaxes(D_12_bin, 0, 1)
@@ -164,7 +168,7 @@ x = np.linspace(-64.5, -45.5,Nbin)
 y = np.linspace(55.25, 64.75,Nbin)
 X, Y = np.meshgrid(x, y)
 
-#%% Add the diffusivity components to 1 xarray dataset
+    #%% Add the diffusivity components to 1 xarray dataset
 k_matrix =xr.Dataset({'k11':(['x','y'],D_11_bin),
                       'k12':(['x','y'],D_12_bin),
                       'k21':(['x','y'],D_21_bin),

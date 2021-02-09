@@ -5,25 +5,25 @@ Created on Wed Dec  2 14:30:28 2020
 
 @author: tychobovenschen
 """
-from IPython import get_ipython
-get_ipython().magic('reset -sf')
+#from IPython import get_ipython
+#get_ipython().magic('reset -sf')
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import animation
-from scipy import stats
-import cartopy.crs as ccrs
-from matplotlib import ticker, cm
-import cartopy.feature as cfeature
-from global_land_mask import globe
-import cartopy.mpl.ticker as cticker
-import matplotlib.colors as colors
+#import matplotlib.pyplot as plt
+#from matplotlib import animation
+from scipy import stats as stats
+#import cartopy.crs as ccrs
+#from matplotlib import ticker, cm
+#import cartopy.feature as cfeature
+#from global_land_mask import globe
+#import cartopy.mpl.ticker as cticker
+#import matplotlib.colors as colors
 import pandas as pd
-from scipy.fft import rfft, rfftfreq
-from datetime import datetime
-from datetime import timedelta
-from binned_statistic import binned_statistic_2d_new
-from reanalysisdata import reanalysis_meanvel
-import pickle
+#from scipy.fft import rfft, rfftfreq
+#from datetime import datetime
+#from datetime import timedelta
+from binned_statistic2 import binned_statistic_2d_new
+#from reanalysisdata import reanalysis_meanvel
+#import pickle
 pi=np.pi
 
 def calc_diff(df, Nbin, mean_method='eulerian'):
@@ -83,8 +83,8 @@ def calc_diff(df, Nbin, mean_method='eulerian'):
     #     vel_res[i] = np.sqrt(u_res[i]**2+v_res[i]**2)
     #Calculate phi, tau and D
     if mean_method=='eulerian':
-        u_res=np.load(Path_data+'u_residual_eulerian.npy')
-        v_res=np.load(Path_data+'v_residual_eulerian.npy')
+        u_res=pd.read_pickle(Path_data+'u_residual_eulerian.npy')
+        v_res=pd.read_pickle(Path_data+'v_residual_eulerian.npy')
         vel_res = np.sqrt(u_res**2+v_res**2)
     for i in range(len(vel_res)):
         D[i] = 1/n * vel_res[i]**2 *np.reshape(tau,-1,order='F')[int(binnumber_new[i])] #The diffusivity
