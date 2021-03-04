@@ -44,10 +44,10 @@ def plot_basicmap():
                                         edgecolor='face',
                                         facecolor=cfeature.COLORS['land'])
 
-    ax.add_feature(land_50m,zorder=1)
-    plt.annotate('Greenland',(-49,63),size=16 ,zorder=3)
-    plt.annotate('Canada',(-64.5,57),size =16, zorder=3)
-    ax.coastlines(resolution='50m',zorder=2)
+    ax.add_feature(land_50m,zorder=0)
+    plt.annotate('Greenland',(-49,63),size=16)
+    plt.annotate('Canada',(-64.5,57),size =16)
+    ax.coastlines(resolution='50m')
     plt.ylabel('Degrees latitude', size=16)
     plt.xlabel('Degrees longitude', size=16)  
     return fig, ax
@@ -58,7 +58,7 @@ def plot_pcolormesh(X,Y,Z,zmin, zmax, title=None, cbarlabel=None, cmap='rainbow'
     plt.title(title, size=24)
     if grid==True:
         ax.grid()
-    plt.pcolormesh(X,Y,Z, vmin=zmin, vmax=zmax, cmap=cmap, transform=ccrs.PlateCarree(), zorder=0)
+    plt.pcolormesh(X,Y,Z, vmin=zmin, vmax=zmax, cmap=cmap, transform=ccrs.PlateCarree())
     plt.colorbar(label=cbarlabel)
 
 def plot_angles(dangle,angle,dist):
@@ -93,7 +93,7 @@ def plot_contour(X,Y,Z,zmin, zmax, title=None, cbarlabel=None, cmap='rainbow', g
     
     
     
-def plot_ellipse(eig_val,eig_vec,Nbin=20):
+def plot_ellipse(eig_val,eig_vec,Nbin=20, scale=8000 ,title='Anisotropy of the diffusivity tensor'):
     """A function for plotting ellipses of the diffusivity tensor"""
     fig, ax=plot_basicmap()
     x = np.linspace(-64.5,-45.5,Nbin)
@@ -103,11 +103,11 @@ def plot_ellipse(eig_val,eig_vec,Nbin=20):
     #calculate largest and smalles eigenvalue
     index_major= abs(eig_val.labda).argmax(dim='i',skipna=False)
     index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
-    ells = EllipseCollection(eig_val.labda.isel(i=index_major)/8000,eig_val.labda.isel(i=index_minor)/8000,\
+    ells = EllipseCollection(eig_val.labda.isel(i=index_major)/scale,eig_val.labda.isel(i=index_minor)/scale,\
                          np.arctan2(eig_vec.mu.isel(i=index_minor,j=0),eig_vec.mu.isel(i=index_minor,j=1)).values/np.pi*180,units='x', offsets=XY,
                        transOffset=ax.transData, facecolors='None',edgecolors='tab:red', offset_position='screen')        
-    bar = AnchoredSizeBar(ax.transData, size=1, label='8000 $m^2/s$', color = 'tab:red', loc=3, frameon=False)
+    bar = AnchoredSizeBar(ax.transData, size=1, label=str(scale)+'$m^2/s$', color = 'tab:red', loc=3, frameon=False)
     ax.add_artist(bar)
-    plt.title('Anisotropy of the diffusivity tensor',size=24)
+    plt.title(title,size=24)
     ax.add_collection(ells)
     plt.show()

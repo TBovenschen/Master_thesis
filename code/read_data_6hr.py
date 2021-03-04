@@ -23,7 +23,7 @@ from datetime import datetime
 #from reanalysisdata import reanalysis_meanvel
 import xarray as xr
 #import tqdm
-#from residual_vel_eul import calc_residual_vel_eul
+from residual_vel_eul import calc_residual_vel_eul
 from plotting_functions import *
 pi=np.pi
 #Data paths:
@@ -104,50 +104,7 @@ df.dropna(inplace=True)
 # df.to_pickle(Path_data+'df.pkl')
 
 # ds, u_res, v_res = calc_residual_vel_eul(df)
-#%%
-Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
-reanalysis_file = 'global-reanalysis-phy-001-030-monthly_1612428165441.nc'
-analysis_file = 'global-analysis-forecast-phy-001-024-monthly_1612428303941.nc'
 
-
-reanalysis = xr.open_dataset(Path_data+reanalysis_file)
-analysis = xr.open_dataset(Path_data+analysis_file)
-
-
-analysis = analysis.sel(depth=13.6, method='nearest')
-reanalysis = reanalysis.squeeze(dim='depth')
-
-ds = reanalysis.combine_first(analysis)
-ds.to_netcdf(Path_data+'Mean_velocities_eulerian.nc')
-
-# filter out grid cells where the ice concentration is more then 10%:
-# ds = ds.where((ds.siconc<0.1) | (xr.ufuncs.isnan(ds.siconc)))
-
-
-#gridsize where to interpolate to
-Nbin=40
-#Interpolate to new grid:
-x = np.linspace(-65,-45,Nbin)
-y = np.linspace(55,65,Nbin)
-ds = ds.interp(longitude=x,  latitude=y, method='linear')
-
-#Reset index of dataframe and create arrays:
-df.reset_index(drop=True,inplace=True)
-u_res =np.zeros(len(df))
-v_res =np.zeros(len(df))
-
-#Calculate the residual velocities
-# for i in range(len(df)):
-u_res = df['ve']/100 - ds.uo.sel(time=xr.DataArray(df['datetime']),longitude=xr.DataArray(df['lon']), latitude=xr.DataArray(df['lat']), method='nearest')
-v_res = df['vn']/100 - ds.vo.sel(time=xr.DataArray(df['datetime']),longitude=xr.DataArray(df['lon']), latitude=xr.DataArray(df['lat']), method='nearest')
-# np.save(Path_data+'u_residual_eulerian.npy', u_res, allow_pickle=False)
-# np.save(Path_data+'v_residual_eulerian.npy', v_res, allow_pickle=False)
-u_res.to_pickle(Path_data+'u_residual_eulerian.npy')
-v_res.to_pickle(Path_data+'v_residual_eulerian.npy')
-
-print(np.count_nonzero(~np.isfinite(u_res)))
-
-# u_res=pd.read_pickle(Path_data+'u_residual_eulerian.npy')
 
 #%% Calculate diffusivities according to Visser:
 
@@ -156,7 +113,7 @@ n=2 #number of dimensions
 dt = 3600*6  #timestep in seconds
 Nbin = 20 #number of bins (in both x and y-direction) to average angles
 
-# phi = np.cos(df['dangle']/360*2*pi)
+phi = np.cos(df['dangle']/360*2*pi)
 Mean_diff, tau, vel_res = calc_diff(df, Nbin,mean_method='eulerian') # function for calculating diffusion according to visser 
 
 Mean_diff_visser = np.swapaxes(Mean_diff,0,1)

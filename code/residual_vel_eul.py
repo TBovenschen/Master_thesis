@@ -30,6 +30,9 @@ def calc_residual_vel_eul(df):
     ds = reanalysis.combine_first(analysis)
     ds.to_netcdf(Path_data+'Mean_velocities_eulerian.nc')
     
+    # filter out grid cells where the ice concentration is more then 10%:
+    # ds = ds.where((ds.siconc<0.1) | (xr.ufuncs.isnan(ds.siconc)))
+    
     #gridsize where to interpolate to
     # Nbin=40
     # #Interpolate to new grid:
@@ -39,14 +42,18 @@ def calc_residual_vel_eul(df):
     
     #Reset index of dataframe and create arrays:
     df.reset_index(drop=True,inplace=True)
-    u_res =np.zeros(len(df))
-    v_res =np.zeros(len(df))
+    # u_res =np.zeros(len(df))
+    # v_res =np.zeros(len(df))
     
     #Calculate the residual velocities
     # for i in range(len(df)):
-    u_res = df['ve']/100 - ds.uo.sel(time=df['datetime'],longitude=df['lon'], latitude=df['lat'], method='nearest')
-    v_res = df['vn']/100 - ds.vo.sel(time=df['datetime'],longitude=df['lon'], latitude=df['lat'], method='nearest')
-    np.save(Path_data+'u_residual_eulerian.npy', u_res, allow_pickle=True)
-    np.save(Path_data+'v_residual_eulerian.npy', v_res, allow_pickle=True)
+    # u_res = df['ve']/100 - ds.uo.sel(time=df['datetime'],longitude=df['lon'], latitude=df['lat'], method='nearest')
+    # v_res = df['vn']/100 - ds.vo.sel(time=df['datetime'],longitude=df['lon'], latitude=df['lat'], method='nearest')
+    u_res = df['ve']/100 - ds.uo.sel(time=xr.DataArray(df['datetime']),longitude=xr.DataArray(df['lon']), latitude=xr.DataArray(df['lat']), method='nearest')
+    v_res = df['vn']/100 - ds.vo.sel(time=xr.DataArray(df['datetime']),longitude=xr.DataArray(df['lon']), latitude=xr.DataArray(df['lat']), method='nearest')
+    u_res.to_pickle(Path_data+'u_residual_eulerian.npy')
+    v_res.to_pickle(Path_data+'v_residual_eulerian.npy')
+    # np.save(Path_data+'u_residual_eulerian_ice.npy', u_res, allow_pickle=True)
+    # np.save(Path_data+'v_residual_eulerian_ice.npy', v_res, allow_pickle=True)
     return ds, u_res, v_res
     

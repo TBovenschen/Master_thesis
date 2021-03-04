@@ -43,11 +43,13 @@ df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.c
 df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
 
 #Load the residual velocities and add them to the dataframe:
-u_res=pd.read_pickle(Path_data+'u_residual_eulerian.npy')
-v_res=pd.read_pickle(Path_data+'v_residual_eulerian.npy')
+u_res=pd.read_pickle(Path_data+'u_residual_eulerian_ice.npy')
+v_res=pd.read_pickle(Path_data+'v_residual_eulerian_ice.npy')
 # v_res =np.load(Path_data+'v_residual_eulerian.npy')
 df['u_res']=u_res
 df['v_res']=v_res
+
+
 
 #Drop all unnecssary columns:
 df.drop(['speed', 'varlat','varlon', 'vart','dangle','dist'],axis=1,inplace=True)
@@ -85,8 +87,6 @@ plot_contour(np.linspace(-65,-45,241),np.linspace(55,65,121), mean_vel_field.uo.
              zmin=-0.6, zmax=0.6, title='Monthly mean zonal velocity', cmap='coolwarm', cbarlabel='$m/s^2$')
 plot_contour(np.linspace(-65,-45,241),np.linspace(55,65,121), mean_vel_field.vo.isel(time=0), \
              zmin=-0.6, zmax=0.6, title='Monthly mean meridional velocity', cmap='coolwarm', cbarlabel='$m/s^2$')
-
-#%%
 
 
 # ############## DAVIS:#############
@@ -134,15 +134,14 @@ df_davis.dropna(inplace=True)
 #%% ######## Calculate the diffusivities ############
 df_davis.reset_index(drop=True,inplace=True)
 
-D_11 = -1*df_davis['u_res'] * df_davis['mf_lon_dist']
-D_12 = -1*df_davis['v_res'] * df_davis['mf_lon_dist']
-D_21 = -1*df_davis['u_res'] * df_davis['mf_lat_dist']
-D_22 = -1*df_davis['v_res'] * df_davis['mf_lat_dist']
+D_11 = -1*df_davis['u_res'] * df_davis['dx_res']
+D_12 = -1*df_davis['v_res'] * df_davis['dx_res']
+D_21 = -1*df_davis['u_res'] * df_davis['dy_res']
+D_22 = -1*df_davis['v_res'] * df_davis['dy_res']
 
-test=np.array(D_11)
  #%%
 #Define number of grid cells in x- and y direction
-Nbin=20
+Nbin=15
 
 
 
@@ -296,7 +295,7 @@ plt.title('Anisotropy (major/minor component')
 
 #%% Plotting of the ellipses
 
-plot_ellipse(eig_val, eig_vec)
+plot_ellipse(eig_val, eig_vec, Nbin)
 
 
 #%%

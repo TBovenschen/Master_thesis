@@ -16,12 +16,11 @@ import pandas as pd
 import pickle
 import cartopy.crs as ccrs
 from scipy import stats
-from binned_statistic import binned_statistic_2d_new
+from binned_statistic2 import binned_statistic_2d_new
 from datetime import datetime
 from datetime import timedelta
 from reanalysisdata import reanalysis_meanvel
-from plotonmap import plotonmap
-from plot_angles import plot_angles
+from plotting_functions import *
 import xarray as xr
 import scipy
 import tqdm
@@ -50,13 +49,15 @@ meanflowdisp=xr.open_dataset(Path_data+'meanflowdisp2.nc') #Hourly trajectory da
 mfd_lon_time=np.zeros((len(df),60*24))
 mfd_lat_time=np.zeros((len(df),60*24))
 
-for i in tqdm.tqdm(range(60*24),position=0,leave=True):
-    mfd_lon_time[:,i]=(meanflowdisp.lon[:,i]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
-    mfd_lat_time[:,i]=(meanflowdisp.lat[:,i]-meanflowdisp.lat[:,0])*1.11e5
+# for i in tqdm.tqdm(range(60*24),position=0,leave=True):
+#     mfd_lon_time[:,i]=(meanflowdisp.lon[:,i]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
+#     mfd_lat_time[:,i]=(meanflowdisp.lat[:,i]-meanflowdisp.lat[:,0])*1.11e5
+mfd_lon_time=(meanflowdisp.lon[:,:]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180)
+mfd_lat_time=(meanflowdisp.lat[:,:]-meanflowdisp.lat[:,0])*1.11e5
     
 #Load the residual velocities and add them to the dataframe:
-u_res =np.load(Path_data+'u_residual_eulerian.npy')
-v_res =np.load(Path_data+'v_residual_eulerian.npy')
+u_res =np.load(Path_data+'u_residual_eulerian.npy', allow_pickle=True)
+v_res =np.load(Path_data+'v_residual_eulerian.npy',  allow_pickle=True)
 df['u_res']=u_res
 df['v_res']=v_res
 
@@ -107,6 +108,29 @@ mfd_lon_time=np.concatenate(mfd_lon_time_split)
 #%%
 
 ########### CALCULATE RESIDUAL DISTANCES:
+# dy_tot= [None]*len(data_split) #Create lists of arrays
+# dx_tot= [None]*len(data_split)
+# dy_res= [None]*len(data_split)
+# dx_res= [None]*len(data_split)
+# timelapse=60*4
+# for i in tqdm.tqdm(range(len(data_split)),position=0,leave=True):
+#     dy_tot[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) #Create array for each trajectory
+#     dx_tot[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
+#     dy_res[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
+#     dx_res[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
+#     for j in range(len(data_split[i])-timelapse):  # Calculate distance for 15 days
+#         for t in range(timelapse):
+#             #Total distances:
+#             dy_tot[i][j,t] = (data_split[i][j+t,3]-data_split[i][j,3])/360*40008e3
+#             dx_tot[i][j,t] = (data_split[i][j+t,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
+#             # Residual distances (total-mean flow distance)
+#             dy_res[i][j,t] = dy_tot[i][j,t] - mfd_lat_time_split[i][j,t*6]
+#             dx_res[i][j,t] = dx_tot[i][j,t] - mfd_lon_time_split[i][j,t*6]      
+
+
+#%%
+
+########### CALCULATE RESIDUAL DISTANCES:
 dy_tot= [None]*len(data_split) #Create lists of arrays
 dx_tot= [None]*len(data_split)
 dy_res= [None]*len(data_split)
@@ -117,14 +141,13 @@ for i in tqdm.tqdm(range(len(data_split)),position=0,leave=True):
     dx_tot[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
     dy_res[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
     dx_res[i]= np.zeros((len(data_split[i])-timelapse,timelapse)) 
-    for j in range(len(data_split[i])-timelapse):  # Calculate distance for 15 days
-        for t in range(timelapse):
-            #Total distances:
-            dy_tot[i][j,t] = (data_split[i][j+t,3]-data_split[i][j,3])/360*40008e3
-            dx_tot[i][j,t] = (data_split[i][j+t,4]-data_split[i][j,4])/360*40075e3*np.cos(data_split[i][j,3]/360*2*np.pi)
-            # Residual distances (total-mean flow distance)
-            dy_res[i][j,t] = dy_tot[i][j,t] - mfd_lat_time_split[i][j,t*6]
-            dx_res[i][j,t] = dx_tot[i][j,t] - mfd_lon_time_split[i][j,t*6]      
+    for t in range(timelapse):
+        #Total distances:
+        dy_tot[i][:,t] = (data_split[i][t:-timelapse+t,3]-data_split[i][:-timelapse,3])/360*40008e3
+        dx_tot[i][:,t] = (data_split[i][t:-timelapse+t,4]-data_split[i][:-timelapse,4])/360*40075e3*np.cos(data_split[i][:-timelapse,3].astype(float)/360*2*np.pi)
+        # # Residual distances (total-mean flow distance)
+        dy_res[i][:,t] = dy_tot[i][:,t] - mfd_lat_time_split[i][:len(data_split[i])-timelapse,t*6]
+        dx_res[i][:,t] = dx_tot[i][:,t] - mfd_lon_time_split[i][:len(data_split[i])-timelapse,t*6] 
 #%%
 # Add again to the dataframe and drop nans:
 nans2d = np.zeros((timelapse,timelapse))*np.nan
@@ -147,12 +170,23 @@ mfd_lon_time.reset_index(drop=True,inplace=True)
 D = np.zeros((len(df_davis),timelapse,2,2)) #create diffusivity tensor (2 dimensional for each datapoint)
 indicesj=['u_res', 'v_res']
 indicesk=[np.array(mfd_lon_time), np.array(mfd_lat_time)]
+
+
 #%%
-for i in tqdm.tqdm(range(len(df_davis)),position=0,leave=True):
-    for t in range(timelapse):
-        for j in range(2):
-            for k in range(2) :
-                D[i,t,j,k] = -df_davis[indicesj[j]][i]*indicesk[k][i,t]
+d11 = np.zeros((len(df_davis),timelapse))
+d12 = np.zeros((len(df_davis),timelapse))
+d21 = np.zeros((len(df_davis),timelapse))
+d22 = np.zeros((len(df_davis),timelapse))
+
+
+
+
+for t in tqdm.tqdm(range(timelapse),position=0):
+    d11[:,t] = -1*df_davis['u_res'] * mfd_lon_time.loc[:,t]
+    d12[:,t] = -1*df_davis['v_res'] * mfd_lon_time.loc[:,t]
+    d21[:,t] = -1*df_davis['u_res'] * mfd_lat_time.loc[:,t]
+    d22[:,t] = -1*df_davis['v_res'] * mfd_lat_time.loc[:,t]
+
 
 
  #%%
@@ -164,10 +198,10 @@ D_21 = np.zeros((Nbin,Nbin,timelapse))
 D_22 = np.zeros((Nbin,Nbin,timelapse))
 #Take the binned average of every component of the diffusivity tensor:
 for t in tqdm.tqdm(range(timelapse),position=0):
-    D_11[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,t,0,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-    D_12[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,t,0,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-    D_21[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,t,1,0],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
-    D_22[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], D[:,t,1,1],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+    D_11[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], d11[:,t],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+    D_12[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], d12[:,t],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+    D_21[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], d21[:,t],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
+    D_22[:,:,t],  xedges, yedges, binnumber_davis = binned_statistic_2d_new(df_davis['lon'],df_davis['lat'], d22[:,t],statistic='nanmean',bins=Nbin, expand_binnumbers=True)
 #%%
     
 D_11=np.swapaxes(D_11,0,1)
@@ -239,8 +273,8 @@ eig_vec =xr.Dataset({'mu':(['x','y','t','i','j'],eig_vec)},
 
 #%%
 
-eig_val = xr.open_dataset(Path_data+'eig_val_60.nc')
-k_S = xr.open_dataset(Path_data+'k_S.nc')
+# eig_val = xr.open_dataset(Path_data+'eig_val_60.nc')
+# k_S = xr.open_dataset(Path_data+'k_S.nc')
 
 #calculate largest and smalles eigenvalue
 index_major= abs(eig_val.labda).argmax(dim='i',skipna=False)
@@ -269,7 +303,7 @@ plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
 
 plt.figure()
 # for i in range(5):
-xr.plot.line(np.mean(norm(np.abs(eig_val.labda.isel(i=index_minor).isel(x=slice(0,20),y=9))),axis=(0)),x='t')
+xr.plot.line((np.abs(eig_val.labda.isel(i=index_major).isel(x=14,y=12))),x='t')
 plt.xlabel('time (days)')
 plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
 plt.ylabel('k')
