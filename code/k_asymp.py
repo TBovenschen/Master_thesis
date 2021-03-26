@@ -3,7 +3,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jan  7 10:58:02 2021
-
 @author: tychobovenschen
 """
 from IPython import get_ipython
@@ -303,7 +302,7 @@ plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
 
 plt.figure()
 # for i in range(5):
-xr.plot.line((np.abs(eig_val.labda.isel(i=index_major).isel(x=14,y=12))),x='t')
+xr.plot.line((np.abs(eig_val.labda.isel(i=index_major).isel(x=9,y=12))),x='t')
 plt.xlabel('time (days)')
 plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
 plt.ylabel('k')
@@ -346,6 +345,3 @@ k_time_y =-dy_res_time*v_res[0]
 
 plt.figure()
 plt.plot(np.arange(ITS),k_time_y)
-
-
-#%%

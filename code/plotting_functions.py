@@ -93,7 +93,7 @@ def plot_contour(X,Y,Z,zmin, zmax, title=None, cbarlabel=None, cmap='rainbow', g
     
     
     
-def plot_ellipse(eig_val,eig_vec,Nbin=20):
+def plot_ellipse(eig_val,eig_vec,Nbin=20, title=None, scale=8000):
     """A function for plotting ellipses of the diffusivity tensor"""
     fig, ax=plot_basicmap()
     x = np.linspace(-64.5,-45.5,Nbin)
@@ -103,11 +103,18 @@ def plot_ellipse(eig_val,eig_vec,Nbin=20):
     #calculate largest and smalles eigenvalue
     index_major= abs(eig_val.labda).argmax(dim='i',skipna=False)
     index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
-    ells = EllipseCollection(eig_val.labda.isel(i=index_major)/8000,eig_val.labda.isel(i=index_minor)/8000,\
+    ells = EllipseCollection(eig_val.labda.isel(i=index_major)/scale,eig_val.labda.isel(i=index_minor)/scale,\
                          np.arctan2(eig_vec.mu.isel(i=index_minor,j=0),eig_vec.mu.isel(i=index_minor,j=1)).values/np.pi*180,units='x', offsets=XY,
                        transOffset=ax.transData, facecolors='None',edgecolors='tab:red', offset_position='screen')        
     bar = AnchoredSizeBar(ax.transData, size=1, label='8000 $m^2/s$', color = 'tab:red', loc=3, frameon=False)
     ax.add_artist(bar)
-    plt.title('Anisotropy of the diffusivity tensor',size=24)
+    signs= np.sign(eig_val.labda.isel(i=index_major)).stack(z=['lat', 'lon'])
+    colors = ['yellow','red', 'blue']
+
+
+# ells.set_array([colors[i] for i in test])
+    # ells.set_cmap('coolwarm')
+    # ells.set_edgecolor(np.array([colors[i] for i in signs.fillna(0).values.astype(int)]))
+    plt.title(title,size=24)
     ax.add_collection(ells)
     plt.show()

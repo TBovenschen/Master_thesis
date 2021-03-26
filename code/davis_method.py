@@ -26,6 +26,9 @@ from plotting_functions import *
 From the diffusivity the symmetric part is taken and from this the eigenvalues and vectors
 are calculated"""
 
+ITS = 5 #integral time scale in days
+
+
 pi=np.pi
 #Data paths:
 Path_data = '/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/'
@@ -39,8 +42,8 @@ df.reset_index(drop=True,inplace=True)
 meanflowdisp=xr.open_dataset(Path_data+'meanflowdisp.nc') #Hourly trajectory data of particles release
 
 #Add the mean flow distance to the dataframe (and convert to meters):
-df['mf_lon_dist']=(meanflowdisp.lon[:,15*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180) 
-df['mf_lat_dist']=(meanflowdisp.lat[:,15*24]-meanflowdisp.lat[:,0])*1.11e5
+df['mf_lon_dist']=(meanflowdisp.lon[:,ITS*24]-meanflowdisp.lon[:,0])*1.11e5 *np.cos(meanflowdisp.lat[:,0]*np.pi/180) 
+df['mf_lat_dist']=(meanflowdisp.lat[:,ITS*24]-meanflowdisp.lat[:,0])*1.11e5
 
 #Load the residual velocities and add them to the dataframe:
 u_res=pd.read_pickle(Path_data+'u_residual_eulerian_ice.npy')
@@ -91,9 +94,9 @@ plot_contour(np.linspace(-65,-45,241),np.linspace(55,65,121), mean_vel_field.vo.
 
 # ############## DAVIS:#############
 
-# Filter out trajectories with less datapoints than 15 days:
+# Filter out trajectories with less datapoints than the integral time scale:
 cnt=0
-timelapse=15*4 #number of datapoints difference (days*4)
+timelapse=ITS*4 #number of datapoints difference (days*4)
 for i in range(len(data_split)):
     if timelapse>len(data_split[cnt]):
         del(data_split[cnt])
@@ -141,7 +144,7 @@ D_22 = -1*df_davis['v_res'] * df_davis['dy_res']
 
  #%%
 #Define number of grid cells in x- and y direction
-Nbin=15
+Nbin=20
 
 
 
@@ -295,8 +298,7 @@ plt.title('Anisotropy (major/minor component')
 
 #%% Plotting of the ellipses
 
-plot_ellipse(eig_val, eig_vec, Nbin)
-
+plot_ellipse(eig_val, eig_vec, Nbin, title='Diffusivities calculated by the Davis(1991) method from observations')
 
 #%%
 
