@@ -18,12 +18,12 @@ from binned_statistic2 import binned_statistic_2d_new
 
     
 def k_davis(output):
-    u_res = output.u[:,-1]
+    u_res = output.u[:,-2]
 
-    dx_res = ((output.x[:,-1]-output.x[:,0]))
-    v_res = (output.v[:,-1])
+    dx_res = ((output.x[:,-2]-output.x[:,0]))
+    v_res = (output.v[:,-2])
 
-    dy_res = ((output.y[:,-1]-output.y[:,0]))
+    dy_res = ((output.y[:,-2]-output.y[:,0]))
     """Function for calculating the diffusivity according to the method of Davis(1991)"""
     #Calculate diffusivity for every data point
     D_11 = - u_res * dx_res 
@@ -34,13 +34,13 @@ def k_davis(output):
     Nbin = 20
     #Bin the diffusivities in different grid cells
     D_11_bin,  xedges, yedges,binnumber_davis = binned_statistic_2d_new(output.x[:,-1],\
-                    output.y[:,-1],D_11.astype('float'), statistic='nanmean',range=([0,20],[0,20]),bins=Nbin)
+                    output.y[:,-1],D_11.astype('float'), statistic='nanmean',range=([-200,200],[-200,200]),bins=Nbin)
     D_12_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(output.x[:,-1],\
-                    output.y[:,-1], D_12.astype('float'), statistic='nanmean',range=([0,20],[0,20]),bins=Nbin, expand_binnumbers=True)
+                    output.y[:,-1], D_12.astype('float'), statistic='nanmean',range=([-200,200],[-200,200]),bins=Nbin, expand_binnumbers=True)
     D_21_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(output.x[:,-1],\
-                    output.y[:,-1], D_21.astype('float'), statistic='nanmean',range=([0,20],[0,20]),bins=Nbin, expand_binnumbers=True)
+                    output.y[:,-1], D_21.astype('float'), statistic='nanmean',range=([-200,200],[-200,200]),bins=Nbin, expand_binnumbers=True)
     D_22_bin,  xedges, yedges, binnumber_davis = binned_statistic_2d_new(output.x[:,-1],\
-                    output.y[:,-1], D_22.astype('float'), statistic='nanmean',range=([0,20],[0,20]),bins=Nbin, expand_binnumbers=True)
+                    output.y[:,-1], D_22.astype('float'), statistic='nanmean',range=([-200,200],[-200,200]),bins=Nbin, expand_binnumbers=True)
     print(D_22_bin)
 
 
@@ -55,7 +55,7 @@ def k_davis(output):
     y = np.linspace(0, 20,Nbin)
     X, Y = np.meshgrid(x, y)
 
-        #%% Add the diffusivity components to 1 xarray dataset
+        # Add the diffusivity components to 1 xarray dataset
 
     #Symmetric part:
     k_S =xr.Dataset({'k11':(['lat','lon'],D_11_bin),
@@ -99,14 +99,16 @@ def k_davis(output):
 #%%
 
 #Parameters:
-Ntraj=10 #Number of particles released (in x and in y direction) so Ntraj**2 is total
-Nobs =1000  #Number of data points per particle
-dt = 0.1    #Delta time
-x = np.linspace(0,200,200)  #X-grid
-y = np.linspace(0,200,200) #Y-grid
+Ntraj=30 #Number of particles released (in x and in y direction) so Ntraj**2 is total
+dt = 1   #Delta time
+lengthtime = 1000
+Nobs =int(lengthtime/dt) #Number of data points per particle
+x = np.linspace(-500,500,200)  #X-grid
+y = np.linspace(-500,500,200) #Y-grid
 
 t = np.linspace(0,Nobs*dt, Nobs)    #Time grid
 
+X,Y,T = np.meshgrid(x,y,t)
 #FIELDSET (not necessary for analytical trajectories)
 BC =xr.Dataset({'u':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs))),
                       'v':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs)))},                     
@@ -133,17 +135,16 @@ tides2 =xr.Dataset({'u':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs))),
 for i in range(Nobs):
     BC['v'][:,:,i] = BC.v[:,:,i] +( 2 - x * 0.04)
 
-tides1['u'] = tides1.u + 2*np.sin(0.1*tides1.time)
-tides2['u'] = tides1.u + 2*np.sin(0.2*tides2.time)
+tides1['u'] = (('y','x','time'),2*np.sin(0.1*T))
+tides2['u'] = (('y','x','time'),2*np.sin(0.2*T))
 
-#%%
-#PARTICLE SET:
+#%%#PARTICLE SET:
 pset =xr.Dataset({'x':(['traj','obs'], np.nan *np.zeros((Ntraj**2,Nobs))),
                       'y':(['traj','obs'],np.nan *np.zeros((Ntraj**2,Nobs))),
                       'u':(['traj','obs'],np.zeros((Ntraj**2,Nobs))),
                       'v':(['traj','obs'],np.zeros((Ntraj**2,Nobs)))})
-releaseX = np.linspace(0,20,Ntraj)
-releaseY = np.linspace(0,20,Ntraj)
+releaseX = np.linspace(-15,16,Ntraj)
+releaseY = np.linspace(-15,16,Ntraj)
 releaseX, releaseY = np.meshgrid(releaseX, releaseY)
 releaseX = np.ravel(releaseX)
 releaseY = np.ravel(releaseY)
@@ -151,97 +152,153 @@ releaseY = np.ravel(releaseY)
 pset['x'][:,0]=releaseX
 pset['y'][:,0]=releaseY
 
-
-
-
-
-
-
-
-
-
-# fieldset = tides+BC
+fieldset = tides1+BC
 # for i in range(len(pset.obs)-1):
     # pset['x'][:,i+1] = pset.x[:,i]+fieldset.u.sel(x=pset.x[:,i], y = pset.y[:,i], time=i, method='nearest') *dt
     # pset['y'][:,i+1] = pset.y[:,i]+fieldset.v.sel(x=pset.x[:,i], y = pset.y[:,i], time=i,  method='nearest') *dt
 
-#%%
-#1 tidal component:
+#%% EXECUTION
+
+
+################### 1 tidal component: ###########################################
+    #u = 2 sin(0.1t)
+    # v = 2-0.04x
 # for i in range(len(pset.traj)):
-    # pset['x'][i]= releaseX[i]-20*np.cos(0.1*pset.obs) + 20
-    # pset['y'][i]= releaseY[i]+(2 - 0.04*releaseX[i] -0.8)*pset.obs + 8 *np.sin(0.1*pset.obs)
+#     pset['x'][i]= releaseX[i]-20*np.cos(0.1*t) + 20
+#     pset['y'][i]= releaseY[i]+(2 - 0.04*releaseX[i] -0.8)*t + 8 *np.sin(0.1*t)
     
-#2 tidal components:
-   #u = 2 sin(0.1t) + 2 sin(0.2t)
-   # v = 2-0.04x
+# ################# 2 tidal components: ################################
+#    u = 2 sin(0.1t) + 2 sin(0.2t)
+#     v = 2-0.04x
 # for i in range(len(pset.traj)):
-    # pset['x'][i]= releaseX[i]-20*np.cos(0.1*pset.obs)  - 10*np.cos(0.2*pset.obs) + 30
-    # pset['y'][i]= releaseY[i]+(2 - 0.04*(releaseX[i] + 30))*pset.obs + 8*np.sin(0.1*pset.obs) + 4 * np.sin(0.2*pset.obs)
+#     pset['x'][i]= releaseX[i]-20*np.cos(0.1*pset.obs)  - 10*np.cos(0.2*pset.obs) + 30
+#     pset['y'][i]= releaseY[i]+(2 - 0.04*(releaseX[i] + 30))*pset.obs + 8*np.sin(0.1*pset.obs) + 4 * np.sin(0.2*pset.obs)
 # pset['u'] =pset.u + fieldset.u.sel(x=pset.x, y =pset.y,time=pset.obs,  method='nearest').values
 
-#Tidal components in different directioins:
+#################### Tidal components in different directioins: ##################
 #u = 2 sin(0.1t)
-# v = 2-0.04x + cos(0.2t)
-for i in range(len(pset.traj)):
-    pset['x'][i]= releaseX[i]-20*np.cos(0.1*pset.obs) + 20
-    pset['y'][i]= releaseY[i]+(2 - 0.04*(releaseX[i] + 20))*pset.obs + 8*np.sin(0.1*pset.obs) + 5 * np.sin(0.2*pset.obs)
+# v = 2-0.04x + sin(0.1t)
+# for i in range(len(pset.traj)):
+#     pset['x'][i]= releaseX[i]-20*np.cos(0.1*pset.obs) + 20
+#     pset['y'][i]= releaseY[i]+(2 - 0.04*(releaseX[i] + 20))*pset.obs + 8 *np.sin(0.1*pset.obs) - 20 * np.cos(0.2*pset.obs) + 20
 
-#Eddy field:
+
+
+
+
+
+#################### Eddy field: ##################################################
+    
+#FIELDSET (not necessary for analytical trajectories)
+eddies =xr.Dataset({'u':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs))),
+                      'v':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs)))},                     
+                  coords={
+                "x": (["x"],x),
+                  "y": (["y"],y),
+                  "time": (["time"],np.linspace(0,Nobs*dt,Nobs)),},)
+    
 A=1
 u0=0
 v0=0
-X,Y = np.meshgrid(x,y)
-u = A * np.cos(0.1 * X) * np.sin(0.1 * Y) + u0
-v = -A * np.sin(0.1*X) * np.cos(0.1* Y) + v0
+dt = 1
+t=np.linspace(0,Nobs*dt,Nobs)
 
-x0 = releaseX
-y0= releaseY
-t= pset.obs/10
-# (-100+np.cos( np.sin(t*x0[i])) + np.cos(np.sin(t*y0[i]))-np.sqrt(400* np.cos(np.sin(t*x0[i]))+(100-np.cos(np.sin(t*x0[i]))-np.cos(np.sin(t*y0[i])))**2/(2*np.cos(np.sin(t)))))
-
-
-# 1/2*(100/(np.cos(np.sin(t)))+x0+y0+ (np.sqrt(400* np.cos(np.sin(t*x0))+
-#                                              (100-np.cos(np.sin(t*x0[i]))-np.cos(np.sin(t*y0[i])))**2))/(2*np.cos(np.sin(t))))
-for i in range(len(pset.traj)):
-    pset['x'][i]= (-100+np.cos( np.sin(t*x0[i])) + np.cos(np.sin(t*y0[i]))+
-                   np.sqrt(400* np.cos(np.sin(t*x0[i]))+(100-np.cos(np.sin(t*x0[i]))-np.cos(np.sin(t*y0[i])))**2/(2*np.cos(np.sin(t)))))
-    pset['y'][i]= 1/2*(100/(np.cos(np.sin(t)))+x0[i]+y0[i]+ (np.sqrt(400* np.cos(np.sin(t*x0[i]))+
-                                             (100-np.cos(np.sin(t*x0[i]))-np.cos(np.sin(t*y0[i])))**2))/(2*np.cos(np.sin(t))))
+X,Y,T = np.meshgrid(x,y,t)
+eddies['u'] = (('y','x','time'),(A * np.cos(0.1 * X) * np.sin(0.1 * Y) + 1*np.sin(0.1*T)))
+eddies['v'] = (('y','x','time'),-A * np.sin(0.1*X) * np.cos(0.1* Y) + v0)
+    
+# eddies['u'] = (('y','x','time'),(A * np.sin(0.1 * X) * np.sin(0.1 * Y)))
+# eddies['v'] = (('y','x','time'),A * np.sin(0.1*X) * np.sin(0.1* Y) + v0)
 
 
-#%%
-plt.figure()
-plt.contourf(v, cmap='coolwarm')
-#%%
-k_S, eig_val, eig_vec = k_davis(pset)
+pset.x[:,0] = releaseX #Set initial position
+pset.y[:,0]= releaseY   #Set initial y-position
 
-#%%
+for t in range(Nobs-1):
+    # pset.u[:,t] = eddies.u.sel(x=pset.x[:,t], y=pset.y[:,t], method='nearest') #Sample the zonal velocity
+    pset.u[:,t] = A * np.cos(0.1 * pset.x[:,t]) * np.sin(0.1 * pset.y[:,t])+np.sin(0.1*t)+ u0 #Sample the zonal velocity
+    pset.v[:,t] = -A * np.sin(0.1 * pset.x[:,t]) * np.cos(0.1 * pset.y[:,t]) + v0 #Sample the zonal velocity
+    pset.x[:,t+1] = pset.u[:,t]*dt+pset.x[:,t]    #Euler forward integration
+    pset.y[:,t+1] = pset.v[:,t]*dt+pset.y[:,t] 
+
+################### EDDY + SHEAR + TIDE ######
+# #FIELDSET (not necessary for analytical trajectories)
+# eddies =xr.Dataset({'u':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs))),
+#                       'v':(['y','x', 'time'],np.zeros((len(y),len(x), Nobs)))},                     
+#                   coords={
+#                 "x": (["x"],x),
+#                   "y": (["y"],y),
+#                   "time": (["time"],np.linspace(0,Nobs*dt,Nobs)),},)
+    
+# A=1
+# u0=0
+# v0=0
+# dt = 1
+# t=np.linspace(0,Nobs*dt,Nobs)
+
+# X,Y,T = np.meshgrid(x,y,t)
+# eddies['u'] = (('y','x','time'),(A * np.cos(0.1 * X) * np.sin(0.1 * Y) + 1*np.sin(0.1*T)))
+# eddies['v'] = (('y','x','time'),-A * np.sin(0.1*X) * np.cos(0.1* Y) + 0.01*X+v0)
+
+# # eddies['u'] = (('y','x','time'),(A * np.sin(0.1 * X) * np.sin(0.1 * Y)))
+# # eddies['v'] = (('y','x','time'),A * np.sin(0.1*X) * np.sin(0.1* Y) + v0)
+
+
+# pset.x[:,0] = releaseX #Set initial position
+# pset.y[:,0]= releaseY   #Set initial y-position
+
+# for t in range(Nobs-1):
+#     # pset.u[:,t] = eddies.u.sel(x=pset.x[:,t], y=pset.y[:,t], method='nearest') #Sample the zonal velocity
+#     pset.u[:,t] = A * np.cos(0.1 * pset.x[:,t]) * np.sin(0.1 * pset.y[:,t])+np.sin(0.1*t) #Sample the zonal velocity
+#     pset.v[:,t] = -A * np.sin(0.1 * pset.x[:,t]) * np.cos(0.1 * pset.y[:,t])+ 0.01*pset.x[:,t]  + v0 #Sample the zonal velocity
+#     pset.x[:,t+1] = pset.u[:,t]*dt+pset.x[:,t]    #Euler forward integration
+#     pset.y[:,t+1] = pset.v[:,t]*dt+pset.y[:,t] 
+
+    #%%
+# plt.figure()
+# plt.contourf(v, cmap='coolwarm')
+
+
+#%%ANIMATE
+import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation
+# Set up formatting for the movie files
+Writer = animation.writers['ffmpeg']
+writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
 fig, ax = plt.subplots()
 xdata, ydata = [], []
-ln = ax.scatter(xdata,ydata,sizes=[5])
-# plt.contourf(BC.x, BC.y, BC.v.isel(time=0),cmap='coolwarm', levels=100,zorder=0)
-
-plt.xlim(-200,100)
-plt.ylim(-200,1000)
-annotation = ax.annotate('Time=', xy=(75, 20))
+ln = ax.scatter(xdata,ydata,sizes=[5],zorder=1)
+# cntr = ax.pcolormesh(x, y, eddies.v.isel(time=0),cmap='coolwarm',vmin=-2, vmax=2,zorder=0, shading='flat')
+# 
+plt.xlim(-500,500)
+plt.ylim(-500,500)
+annotation = ax.annotate('Time=', xy=(-55, 50))
 annotation.set_animated(True)
+# plt.colorbar(cntr,label='zonal velocity')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Eddies + tides + shear ')
 def init():
-    return ln, annotation
+    return ln, annotation, #cntr,
 
 def update(i):
     annotation.set_text('Time='+str(i))
     ln.set_offsets(np.c_[pset.x.isel(obs=i), pset.y.isel(obs=i)])
-    return ln, annotation
+    # cntr[0] = ax.pcolormesh(eddies.x, eddies.y, eddies.u.isel(time=i),cmap='coolwarm',vmin=-2, vmax=2,zorder=0)
+    # cntr.set_array(eddies.v.isel(time=i).values[:-1,:-1].ravel())
+    return ln, annotation, #cntr,
+
+
 
 ani = FuncAnimation(fig, update, frames=1000,
-                    init_func=init, blit=True, interval = 100)
-plt.colorbar(label='Meridional velocity')
+                    init_func=init, blit=True, interval = 1)
 
-plt.show()
+# ani.save('/Users/tychobovenschen/Documents/MasterJaar2/Thesis/plots/eddies_tides_shear.mp4', writer=writer)
+# plt.show()
 
 
-
+#%%
+k_S, eig_val, eig_vec = k_davis(pset)
 #%%
 scale=10
 X, Y = np.meshgrid(x,y)
@@ -249,7 +306,7 @@ XY = np.column_stack((X.ravel(), Y.ravel()))
 #calculate largest and smalles eigenvalue
 fig =plt.figure()
 ax = plt.axes()
-plt.xlim(0,50)
+plt.xlim(-200,200)
 plt.ylim(-100,100)
 index_major= abs(eig_val.labda).argmax(dim='i',skipna=False)
 index_minor= abs(eig_val.labda).argmin(dim='i',skipna=False)
@@ -271,3 +328,21 @@ plt.show()
 
 # from plotting_functions import *
 # plot_ellipse(eig_val, eig_vec, scale=1)
+
+#%%Calculate variancex
+
+
+plt.figure()
+s = np.var(pset.x, axis=0)
+diff = 1/2*(s[1:]-s[:-1])/dt
+s.plot()
+plt.xlabel('time', size =14)
+plt.title('Variance of x-displacement of tide+eddy simulation', size = 16)
+plt.ylabel('$\sigma^2$', size =14)
+
+plt.figure()
+diff.plot()
+# plt.ylim(-1,1)
+plt.xlabel('time', size =14)
+plt.title('Diffusivity in x-direction of tide+eddy simulation', size = 16)
+plt.ylabel('$k$', size =14)

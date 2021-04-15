@@ -300,16 +300,6 @@ plt.title('Anisotropy (major/minor component')
 
 plot_ellipse(eig_val, eig_vec, Nbin, title='Diffusivities calculated by the Davis(1991) method from observations')
 
-#%%
 
-# ds 
-# ds.sel(lat=60)
-# bath = xr.open_dataset(Path_data+'gebco_2020_n65.0_s55.0_w-65.0_e-45.0.nc')
 
-# # bath = bath.interp(lon=x, lat=y)
-# bath_df = bath.sel(lon=df_davis.lon.to_xarray(),lat=df_davis.lat.to_xarray(), method='nearest')
-
-# bath_binned,bin_edges,_ = stats.binned_statistic(bath_df.elevation.values, np.abs(D_11), bins=200)
-
-# plt.scatter(bin_edges[:-1],bath_binned)
 

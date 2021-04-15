@@ -302,7 +302,7 @@ plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
 
 plt.figure()
 # for i in range(5):
-xr.plot.line((np.abs(eig_val.labda.isel(i=index_major).isel(x=9,y=12))),x='t')
+xr.plot.line((np.abs(eig_val.labda.isel(i=index_minor).isel(x=slice(0,20),y=10))),x='t')
 plt.xlabel('time (days)')
 plt.xticks(np.linspace(0,241,11),(np.linspace(0,60,11,dtype=int)))
 plt.ylabel('k')
