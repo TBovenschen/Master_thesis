@@ -14,12 +14,12 @@ ds = xr.open_dataset('/Users/tychobovenschen/Documents/MasterJaar2/Thesis/data/M
 
 # ds = ds.sel(longitude=slice(-65,-45), latitude=slice(55,65)).isel(depth=0)
 # ds.plot.scatter(hue='Age' ,x='lon', y='lat')
-ds = ds.interp(longitude=np.linspace(-65,-45,50), latitude = np.linspace(55,65,50), method = 'linear')
+ds = ds.interp(longitude=np.linspace(-65,-45,30), latitude = np.linspace(55,65,15), method = 'linear')
 
 # test = timedelta(hours=3)
 # plt.figure()
 plot_basicmap()
-test = plt.quiver(ds.longitude, ds.latitude, ds.uo.mean(dim='time'), ds.vo.mean(dim='time'), scale=0.4, scale_units='inches')
+test = plt.quiver(ds.longitude, ds.latitude, ds.uo.mean(dim='time'), ds.vo.mean(dim='time'), scale=0.5, scale_units='inches')
 
 # test = plt.quiver(ds.longitude, ds.latitude, ds.uo.isel(time=0), ds.vo.isel(time=50), scale=0.4, scale_units='inches')
 quiversize=0.5
