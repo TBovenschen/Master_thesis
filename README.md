@@ -1,8 +1,9 @@
 # Thesis
  
 The code for my thesis on my local computer. Scripts are used to calculate diffusivities from observational data as well as from Parcels model data. Furthermore, there is a script for an idealized model where particles are advected on a velocity field with tides, eddies and shear. 
+**
+File descriptions:**
 
-File descriptions:
 binnedstatistic2.py : An adapted version of the scipy binnedstatistics module
 
 calc_angle.py       : A function for calculating angles of consecutive drifter segments
